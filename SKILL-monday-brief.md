@@ -13,16 +13,20 @@ PODCAST_DIR: `~/Library/Mobile Documents/com~apple~CloudDocs/Claude/JARVIS Podca
 This show contains personal material: calendar, inbox, family, plans. That is
 intended and correct.
 
-**Write to `PODCAST_DIR/scripts-private/YYYY-MM-DD.txt`.**
+**Write the full script to `PODCAST_DIR/scripts-private/YYYY-MM-DD.txt`.**
 
-**Never write to `PODCAST_DIR/scripts/`.** `publish.py` globs that folder, takes
-the newest `.md`/`.txt` by modification time, narrates it, and pushes it to
-`github.com/jtdancy-jarvis/monday-brief` — a repo that `SETUP.md` states must be
-public, serving a feed claimed on Spotify and pollable by any podcast app. The
-feed identifies the owner by name and email. A personal script in `scripts/`
-publishes Tyler's week to the open internet at 5:15am Monday.
+**Never write the personal script to `PODCAST_DIR/scripts/`.** Any date-stamped
+`.md`/`.txt` committed there and pushed is picked up by CI
+(`.github/workflows/publish.yml`), narrated, and published to
+`github.com/jtdancy-jarvis/monday-brief` — a public repo serving a feed claimed
+on Spotify and pollable by any podcast app. The feed identifies the owner by
+name and email.
 
-Publishing is a deliberate act: `./publish.py --script <file>`. Not automatic.
+What DOES go in `scripts/` is the **sanitized public cut**: the private script
+minus the YOUR WEEK segment and minus anything referencing the calendar, inbox,
+family members, travel dates, or money. Name it
+`monday-brief-YYYY-MM-DD.txt` (the filename date names the episode's feed
+slot), commit, push. The push is the publish button — see README.md.
 
 Two things still warrant care even in a private episode, because audio outlives
 its context and a passenger may be in the car:

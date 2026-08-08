@@ -18,10 +18,6 @@ repo/
 # already backing them up.
 scripts-private/
 
-# Already published as repo/episodes/2026-08-03.mp3 - no need for a 7MB copy.
-8-3-26 Podcast.mp3
-audio-demo.mp3
-
 # assets/*.wav ARE committed on purpose. audio_post.master() skips the music
 # beds silently when they are missing, so a runner without them produces a
 # quietly worse episode rather than an error.

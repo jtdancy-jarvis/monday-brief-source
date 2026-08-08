@@ -127,11 +127,11 @@ $(printf "\033[1mDone.\033[0m")
 Your feed will be served at:
     https://$USER.github.io/$REPO/feed.xml
 
-Next:
-  1. export OPENAI_API_KEY="sk-..."      (add to ~/.zshrc to make it stick)
-  2. ./publish.py --audio "8-3-26 Podcast.mp3" --date 2026-08-03 --dry-run
-  3. listen to repo/episodes/2026-08-03.mp3, then re-run without --dry-run
-  4. paste the feed URL into podcasters.spotify.com to claim the show
+Next (details in README.md):
+  1. Add OPENAI_API_KEY and FEED_REPO_TOKEN as Actions secrets on the
+     private source repo -- publishing runs in CI, not on this machine.
+  2. Paste the feed URL into podcasters.spotify.com to claim the show
+     (skip if already claimed).
 
 Pages can take 1-2 minutes to serve for the first time.
 EOF

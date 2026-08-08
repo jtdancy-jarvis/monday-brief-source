@@ -9,11 +9,15 @@ Pipeline:
 Spotify (and Apple, Overcast, etc.) pull the feed from GitHub Pages.
 Nothing is uploaded to Spotify directly -- there is no supported API for that.
 
-Usage:
-  ./publish.py --dry-run                 # build everything, don't push
-  ./publish.py                           # build and push
-  ./publish.py --audio "8-3-26 Podcast.mp3"   # skip TTS, publish an existing mp3
-  ./publish.py --title "..." --date 2026-08-03
+Usage (--date is always required; it names the episode's slot in the feed):
+  ./publish.py --date 2026-08-17 --dry-run      # build everything, don't push
+  ./publish.py --date 2026-08-17                # build and push
+  ./publish.py --date 2026-08-17 --audio ep.mp3 # skip TTS, publish existing mp3
+  ./publish.py --date 2026-08-17 --script scripts/monday-brief-2026-08-17.txt
+
+Normally none of this is run by hand: CI (.github/workflows/publish.yml) runs it
+when a script lands in scripts/, passing --script and --date picked from the
+filename.
 """
 
 import argparse
@@ -323,7 +327,7 @@ def main():
     ap.add_argument("--audio", help="publish an existing mp3 instead of running TTS")
     ap.add_argument("--script", help="path to a specific script file")
     ap.add_argument("--title", help="episode title")
-    ap.add_argument("--date", help="episode date, YYYY-MM-DD (default: today)")
+    ap.add_argument("--date", help="episode date, YYYY-MM-DD (required)")
     args = ap.parse_args()
 
     need("ffmpeg")
@@ -337,7 +341,12 @@ def main():
     work.mkdir(exist_ok=True)
     (repo_dir / "episodes").mkdir(parents=True, exist_ok=True)
 
-    date = args.date or dt.date.today().isoformat()
+    # The date names the episode's slot in the feed. Defaulting it to "today"
+    # once overwrote a published episode when a test ran on the wrong day, so
+    # it must always be stated.
+    if not args.date:
+        die("--date is required; it names the episode file and its feed slot")
+    date = args.date
     try:
         dt.datetime.strptime(date, "%Y-%m-%d")
     except ValueError:

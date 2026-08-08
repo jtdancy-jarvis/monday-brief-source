@@ -1,0 +1,76 @@
+name: Monday feed watchdog
+
+# The publish workflow can only report failures of runs that started. If the
+# Sunday producer never writes a script, never pushes, or pushes something the
+# path filter misses, no run starts and nothing complains. This closes that
+# gap: every Monday at 10:30 UTC (6:30am ET), check that the live feed's
+# newest episode is dated today, and open an issue if it is not.
+#
+# No secrets needed -- the feed is public, and GITHUB_TOKEN can file issues.
+
+on:
+  schedule:
+    - cron: '30 10 * * 1'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Newest episode should be dated today
+        id: check
+        run: |
+          python3 - <<'PY'
+          import datetime as dt
+          import re
+          import sys
+          import urllib.request
+
+          FEED = "https://jtdancy-jarvis.github.io/monday-brief/feed.xml"
+          today = dt.datetime.now(dt.timezone.utc).date()
+
+          try:
+              with urllib.request.urlopen(FEED, timeout=60) as r:
+                  xml = r.read().decode()
+          except Exception as e:
+              print(f"::error::could not fetch {FEED}: {e}")
+              sys.exit(1)
+
+          # Enclosure URLs embed the episode date; the first item is newest.
+          m = re.search(r"episodes/(\d{4}-\d{2}-\d{2})\.mp3", xml)
+          if not m:
+              print("::error::no episode found in the feed at all")
+              sys.exit(1)
+
+          newest = dt.date.fromisoformat(m.group(1))
+          if newest < today:
+              print(f"::error::newest episode is {newest}, expected {today}")
+              sys.exit(1)
+          print(f"feed is fresh: newest episode {newest}")
+          PY
+
+      - name: Open an issue if the feed is stale
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "No fresh episode in the feed this Monday" \
+            --body "The Monday feed watchdog found the newest episode is not dated today.
+
+          Likely causes, in order:
+          1. The Sunday producer task never ran or never pushed a script.
+          2. The pushed filename has no \`YYYY-MM-DD\` date or missed the \`scripts/\` path filter.
+          3. The publish workflow ran and failed (it files its own issue -- check for one).
+
+          Feed: https://jtdancy-jarvis.github.io/monday-brief/feed.xml
+          Run log: $RUN_URL" \
+            --label bug 2>/dev/null || \
+          gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "No fresh episode in the feed this Monday" \
+            --body "The newest episode in the feed is not dated today. Run log: $RUN_URL"
