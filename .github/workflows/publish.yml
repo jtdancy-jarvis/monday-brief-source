@@ -52,30 +52,29 @@ jobs:
       # Shallow on purpose. publish.py only adds a commit on top of current
       # state, and this repo grows ~7.5 MB an episode -- a full-history clone
       # gets slower every week for nothing.
+      # Authenticated by a deploy key, not a PAT: scoped to this one repo and
+      # it does not expire. A PAT's expiry is a silent Sunday-night failure.
       - name: Check out feed repo (public, served by Pages)
         uses: actions/checkout@v4
         with:
           repository: jtdancy-jarvis/monday-brief
           path: repo
-          token: ${{ secrets.FEED_REPO_TOKEN }}
+          ssh-key: ${{ secrets.FEED_DEPLOY_KEY }}
 
-      # The token's write access is the one thing that has actually failed in
-      # production (run #1: full narration, then 403 on the final push). Prove
-      # it can push BEFORE burning TTS spend, not after. Checkout alone proves
-      # nothing -- the feed repo is public, so any token can read it.
-      - name: Preflight - token can push, feed repo has headroom
-        env:
-          TOKEN: ${{ secrets.FEED_REPO_TOKEN }}
+      # Write access is the one thing that has actually failed in production
+      # (run #1: full narration, then 403 on the final push). Prove the push
+      # will work BEFORE burning TTS spend, not after. Checking out is not
+      # proof -- the feed repo is public, so read access means nothing here.
+      # --dry-run contacts the server and runs the real permission check
+      # without creating a commit.
+      - name: Preflight - can actually push, and Pages has headroom
         run: |
           set -euo pipefail
-          push=$(curl -sf -H "Authorization: Bearer $TOKEN" \
-            https://api.github.com/repos/jtdancy-jarvis/monday-brief \
-            | jq -r '.permissions.push // false')
-          if [ "$push" != "true" ]; then
-            echo "::error::FEED_REPO_TOKEN cannot push to jtdancy-jarvis/monday-brief. Regenerate it: fine-grained token, repository access ONLY jtdancy-jarvis/monday-brief, permission Contents: Read and write. Then: gh secret set FEED_REPO_TOKEN --repo jtdancy-jarvis/monday-brief-source"
+          if ! git -C repo push --dry-run origin HEAD:main 2>&1 | tee /tmp/push-check; then
+            echo "::error::Cannot push to jtdancy-jarvis/monday-brief. The FEED_DEPLOY_KEY secret and the repo's deploy key must be the two halves of one keypair, and the deploy key must be write-enabled (gh repo deploy-key list --repo jtdancy-jarvis/monday-brief)."
             exit 1
           fi
-          echo "token OK: push access to the feed repo confirmed"
+          echo "push access to the feed repo confirmed"
           # GitHub Pages stops serving at 1 GB. ~7.5 MB/episode means the wall
           # arrives on schedule; start warning at 700 MB.
           kb=$(curl -s https://api.github.com/repos/jtdancy-jarvis/monday-brief | jq -r '.size // 0')

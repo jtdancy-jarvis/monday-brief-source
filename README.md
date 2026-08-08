@@ -87,10 +87,22 @@ fixing a typo in a six-month-old script.
 1. `./setup.sh` — installs tools, logs into GitHub, creates/wires the public
    repo, enables Pages.
 2. Secrets on the source repo (Settings → Secrets → Actions):
-   `OPENAI_API_KEY`, and `FEED_REPO_TOKEN` — a fine-grained PAT scoped to
-   **only** `jtdancy-jarvis/monday-brief` with **Contents: Read and write**.
-   Set a calendar reminder for the token's expiry; the preflight step catches
-   a dead token before any money is spent, but only an issue tells you about it.
+   - `OPENAI_API_KEY` — for narration.
+   - `FEED_DEPLOY_KEY` — the **private** half of an ssh keypair whose public
+     half is registered on `jtdancy-jarvis/monday-brief` as a write-enabled
+     deploy key. Deploy keys are scoped to one repo and never expire, which
+     is why this is not a personal access token: a PAT's expiry date is a
+     silent Sunday-night failure waiting to happen.
+
+   To rotate it:
+
+   ```bash
+   ssh-keygen -t ed25519 -N "" -C monday-brief-ci -f /tmp/feedkey
+   gh repo deploy-key add /tmp/feedkey.pub --repo jtdancy-jarvis/monday-brief \
+     --title "monday-brief-ci (Actions publisher)" --allow-write
+   gh secret set FEED_DEPLOY_KEY --repo jtdancy-jarvis/monday-brief-source < /tmp/feedkey
+   rm /tmp/feedkey /tmp/feedkey.pub
+   ```
 3. The feed URL, already claimed on Spotify:
    `https://jtdancy-jarvis.github.io/monday-brief/feed.xml`
 
