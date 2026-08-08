@@ -1,0 +1,27 @@
+work/
+.DS_Store
+__pycache__/
+*.pyc
+
+# Local Claude tool permissions. Machine-specific, contains absolute paths,
+# and has nothing to do with producing an episode.
+.claude/
+**/.claude/settings.local.json
+
+# repo/ is a checkout of the PUBLIC feed repo. In CI it is created by a second
+# actions/checkout step. Committing it here would nest one git repo inside
+# another and push public episode audio into the private source repo.
+repo/
+
+# Personal episodes stay out of git entirely until the private-hosting question
+# is settled. They contain family names, travel dates and payday. iCloud is
+# already backing them up.
+scripts-private/
+
+# Already published as repo/episodes/2026-08-03.mp3 - no need for a 7MB copy.
+8-3-26 Podcast.mp3
+audio-demo.mp3
+
+# assets/*.wav ARE committed on purpose. audio_post.master() skips the music
+# beds silently when they are missing, so a runner without them produces a
+# quietly worse episode rather than an error.

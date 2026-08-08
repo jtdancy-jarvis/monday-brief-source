@@ -1,0 +1,176 @@
+name: Publish Monday Brief
+
+# Source of truth for scheduling is the PUSH, not a clock. When a script lands
+# in scripts/, this runs. That way the Sunday producer job and the publisher
+# never have to agree on a time, and a sleeping Mac cannot miss a window.
+#
+# scripts-private/ is deliberately NOT a trigger path. Personal episodes must
+# stay manual until the private-hosting question is settled.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/**/*.txt'
+      - 'scripts/**/*.md'
+      - 'scripts/*.txt'
+      - 'scripts/*.md'
+  workflow_dispatch:
+    inputs:
+      script:
+        description: 'Filename inside scripts/ (blank = newest by date in filename)'
+        required: false
+      date:
+        description: 'Episode date YYYY-MM-DD (blank = read it off the filename)'
+        required: false
+      dry_run:
+        description: 'Build and master, but do not push to the feed'
+        type: boolean
+        default: false
+
+# Two publishes racing each other would fight over feed.xml.
+concurrency:
+  group: publish-monday-brief
+  cancel-in-progress: false
+
+# The push to the public feed repo uses FEED_REPO_TOKEN, not GITHUB_TOKEN, so
+# the job needs nothing here beyond reading its own source and filing an issue
+# when a run fails.
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source (this repo, private)
+        uses: actions/checkout@v4
+
+      # Shallow on purpose. publish.py only adds a commit on top of current
+      # state, and this repo grows ~7.5 MB an episode -- a full-history clone
+      # gets slower every week for nothing.
+      - name: Check out feed repo (public, served by Pages)
+        uses: actions/checkout@v4
+        with:
+          repository: jtdancy-jarvis/monday-brief
+          path: repo
+          token: ${{ secrets.FEED_REPO_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
+
+      # publish.py normally picks the newest script by MODIFICATION TIME. That is
+      # correct on the Mac and completely wrong in CI, where a fresh checkout
+      # gives every file the same mtime and the "newest" script is arbitrary.
+      # So we choose explicitly, by the date embedded in the filename.
+      - name: Choose script and episode date
+        id: pick
+        run: |
+          python3 - <<'PY'
+          import os, re, sys
+          from pathlib import Path
+
+          want   = os.environ.get("IN_SCRIPT", "").strip()
+          want_d = os.environ.get("IN_DATE", "").strip()
+          DATE   = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+          def fail(msg):
+              print(f"::error::{msg}")
+              sys.exit(1)
+
+          if want:
+              script = Path("scripts") / want
+              if not script.is_file():
+                  fail(f"{script} not found")
+          else:
+              cands = [p for p in Path("scripts").glob("*")
+                       if p.suffix in (".txt", ".md") and DATE.search(p.name)]
+              if not cands:
+                  fail("no date-stamped .txt or .md script in scripts/")
+              # Order on the date embedded in the filename. Never mtime, never path.
+              script = max(cands, key=lambda p: DATE.search(p.name).group(0))
+
+          if want_d:
+              date = want_d
+          else:
+              m = DATE.search(script.name)
+              if not m:
+                  fail(f"no YYYY-MM-DD in {script.name}; pass date manually")
+              date = m.group(0)
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
+              fh.write(f"script={script.as_posix()}\n")
+              fh.write(f"date={date}\n")
+          print(f"::notice::publishing {script.as_posix()} as episode {date}")
+          PY
+        env:
+          IN_SCRIPT: ${{ inputs.script }}
+          IN_DATE: ${{ inputs.date }}
+
+      - name: Configure commit identity on the feed repo
+        run: |
+          git -C repo config user.name  "monday-brief-bot"
+          git -C repo config user.email "jtdancy@gmail.com"
+
+      - name: Narrate, master, rebuild feed, push
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          ARGS=(--script "${{ steps.pick.outputs.script }}"
+                --date   "${{ steps.pick.outputs.date }}")
+          if [ "${DRY_RUN:-false}" = "true" ]; then
+            ARGS+=(--dry-run)
+            echo "::warning::dry run - nothing will be pushed to the feed"
+          fi
+          python3 ./publish.py "${ARGS[@]}"
+
+      # Always keep the audio, so a bad episode can be listened to and diagnosed
+      # without re-burning TTS spend. Skipped when the pick step never produced
+      # a date, which would otherwise upload an empty "episode-" artifact.
+      - name: Upload episode audio
+        if: always() && steps.pick.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: episode-${{ steps.pick.outputs.date }}
+          path: repo/episodes/${{ steps.pick.outputs.date }}.mp3
+          if-no-files-found: warn
+          retention-days: 30
+
+      # An expired token or a TTS outage on a Sunday night is otherwise silent:
+      # no episode Monday, and nobody finds out until they go looking. File an
+      # issue so the failure has somewhere to surface.
+      - name: Open an issue if the run failed
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EPISODE: ${{ steps.pick.outputs.date || 'unknown' }}
+        run: |
+          gh issue create \
+            --title "Publish failed for episode $EPISODE" \
+            --body "The Monday Brief publish workflow failed.
+
+          Episode date: \`$EPISODE\`
+          Run log: $RUN_URL
+
+          Nothing was pushed to the feed. Check the run log, fix the cause, then
+          re-run via Actions -> Publish Monday Brief -> Run workflow." \
+            --label bug 2>/dev/null || \
+          gh issue create \
+            --title "Publish failed for episode $EPISODE" \
+            --body "The Monday Brief publish workflow failed. Run log: $RUN_URL"

@@ -1,0 +1,30 @@
+{
+  "github": {
+    "username": "jtdancy-jarvis",
+    "repo": "monday-brief",
+    "branch": "main"
+  },
+  "podcast": {
+    "title": "The Monday Brief",
+    "subtitle": "A weekly curation of what's worth your attention",
+    "description": "Every Monday morning: podcasts, videos, music, films, series and books worth your time. Assembled and narrated automatically.",
+    "author": "Tyler Dancy",
+    "email": "jtdancy@gmail.com",
+    "language": "en-us",
+    "category": "Society & Culture",
+    "subcategory": "Documentary",
+    "explicit": "false",
+    "copyright": "Tyler Dancy"
+  },
+  "tts": {
+    "model": "gpt-4o-mini-tts",
+    "voice": "onyx",
+    "max_chars": 4000,
+    "instructions": "You are an experienced podcast host. Speak conversationally as if talking to one listener. Use natural pacing with occasional brief pauses between ideas. Emphasize important points subtly. Avoid sounding like you're reading a script. Maintain a warm, confident, engaging tone.."
+  },
+  "paths": {
+    "script_dir": "scripts",
+    "repo_dir": "repo",
+    "work_dir": "work"
+  }
+}
