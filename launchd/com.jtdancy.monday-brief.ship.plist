@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Monday Brief - auto-ship agent.
+
+  Watches scripts/ and runs ship in auto mode when something lands there. ship
+  is a no-op when there is nothing new, so firing often is harmless.
+
+  (No double hyphens anywhere in this comment on purpose: XML comments cannot
+  contain them, and a plist that will not parse fails silently in launchd.)
+
+  This does NOT schedule the show. publish.yml's comment still holds: the source
+  of truth for scheduling is the push, not a clock. This agent only carries a
+  finished script from the folder to the remote; it never decides that an
+  episode exists. That is why it is not a return of the retired launchd
+  producer path.
+
+  A LaunchAgent (not a daemon) on purpose: it runs inside the logged-in GUI
+  session, which is what lets git reach the login keychain for the push
+  credential. As a daemon it would have no keychain and every push would fail.
+
+  Install:
+    cp launchd/com.jtdancy.monday-brief.ship.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.jtdancy.monday-brief.ship.plist
+    launchctl enable gui/$UID/com.jtdancy.monday-brief.ship
+
+  Check on it:
+    launchctl print gui/$UID/com.jtdancy.monday-brief.ship | head -20
+    tail -f ~/Library/Logs/monday-brief-ship.log
+
+  Run it right now without waiting:
+    launchctl kickstart -p gui/$UID/com.jtdancy.monday-brief.ship
+
+  Remove:
+    launchctl bootout gui/$UID/com.jtdancy.monday-brief.ship
+    rm ~/Library/LaunchAgents/com.jtdancy.monday-brief.ship.plist
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.jtdancy.monday-brief.ship</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-lc</string>
+        <string>"$HOME/Library/Mobile Documents/com~apple~CloudDocs/Claude/JARVIS Podcast/ship" --auto</string>
+    </array>
+
+    <!-- Fires when anything in scripts/ changes. -->
+    <key>WatchPaths</key>
+    <array>
+        <string>/Users/dancy/Library/Mobile Documents/com~apple~CloudDocs/Claude/JARVIS Podcast/scripts</string>
+    </array>
+
+    <!-- Backstop. WatchPaths is not always reliable on an iCloud folder: a file
+         that arrives by sync rather than by local write can fail to fire the
+         event. A half-hourly sweep costs nothing because ship exits silently
+         when there is nothing to do, and it means a missed event delays the
+         episode by minutes rather than losing it. -->
+    <key>StartInterval</key>
+    <integer>1800</integer>
+
+    <!-- Catch anything written while the agent was unloaded or the Mac asleep. -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Writing a script is several file events. Do not run once per event. -->
+    <key>ThrottleInterval</key>
+    <integer>60</integer>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/dancy/Library/Mobile Documents/com~apple~CloudDocs/Claude/JARVIS Podcast</string>
+
+    <!-- launchd hands over a minimal PATH. Spell out where git actually is,
+         Apple silicon and Intel Homebrew both. -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <!-- One log, appended, so a failed Sunday is still readable on Tuesday. -->
+    <key>StandardOutPath</key>
+    <string>/Users/dancy/Library/Logs/monday-brief-ship.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/dancy/Library/Logs/monday-brief-ship.log</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

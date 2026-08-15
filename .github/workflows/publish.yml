@@ -46,7 +46,10 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - name: Check out source (this repo, private)
+      # Public since 2026-08-09. Nothing here relies on it being private, but do
+      # not add anything that would: secrets belong in Actions secrets, and
+      # personal episodes stay in gitignored scripts-private/.
+      - name: Check out source (this repo)
         uses: actions/checkout@v4
 
       # Shallow on purpose. publish.py only adds a commit on top of current

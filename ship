@@ -1,0 +1,159 @@
+#!/usr/bin/env bash
+#
+# ship - commit and push a finished public episode, and nothing else.
+#
+# A push to scripts/*.txt on main triggers .github/workflows/publish.yml, which
+# narrates the script and pushes the mp3 to the public feed repo behind Spotify.
+# So this script is the last gate before something becomes public, and it is
+# deliberately narrow:
+#
+#   - It stages EXPLICIT paths under scripts/ only. Never `git add -A`. This
+#     folder lives in iCloud Drive, and an evicted file reads as modified even
+#     when its contents are untouched; `-A` would then stage a phantom change to
+#     an already-published episode and republish it into the same feed slot.
+#   - It only ships NEW date-stamped scripts by default. Editing an old script
+#     republishes that episode, so that needs --republish said out loud.
+#   - It refuses to ship text that will narrate badly (numerals, markdown), the
+#     two checks SKILL-monday-brief.md requires. --force overrides.
+#
+# Safe to run repeatedly. With nothing new to ship it exits 0 and says nothing,
+# which is what makes it usable from a launchd WatchPaths agent.
+#
+# Usage:
+#   ./ship                 ship any new date-stamped script in scripts/
+#   ./ship --dry-run       show what would happen, touch nothing
+#   ./ship --republish     also ship edits to already-published scripts
+#   ./ship --force         ship even if the TTS text checks fail
+#   ./ship --auto          quiet mode for launchd; no prompts, logs timestamps
+
+set -euo pipefail
+
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+AUTO=0; REPUBLISH=0; DRY=0; FORCE=0
+
+for arg in "$@"; do
+  case "$arg" in
+    --auto)      AUTO=1 ;;
+    --republish) REPUBLISH=1 ;;
+    --dry-run|-n) DRY=1 ;;
+    --force)     FORCE=1 ;;
+    -h|--help)   sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) printf 'ship: unknown option %s (try --help)\n' "$arg" >&2; exit 2 ;;
+  esac
+done
+
+log()  { if [ "$AUTO" = 1 ]; then printf '%s ship: %s\n' "$(date '+%F %T')" "$*"; else printf 'ship: %s\n' "$*"; fi; }
+die()  { log "ERROR: $*" >&2; exit 1; }
+note() { [ "$AUTO" = 1 ] || printf 'ship: %s\n' "$*"; }
+
+DATED='[0-9]{4}-[0-9]{2}-[0-9]{2}'
+
+# --- sanity -----------------------------------------------------------------
+
+git rev-parse --git-dir >/dev/null 2>&1 || die "not a git repository"
+
+branch=$(git branch --show-current)
+[ "$branch" = "main" ] || die "on branch '$branch', not main. Publishing only runs from main."
+
+# --- iCloud: materialise before git looks at anything -----------------------
+#
+# An evicted file passes stat() but fails to read, and git reports it modified.
+# Reading it in full blocks until iCloud has actually pulled it down. This is
+# the cheap fix for the failure the README warns about under Known limits.
+
+note "materialising tracked files (iCloud)..."
+while IFS= read -r -d '' f; do
+  [ -f "$f" ] || continue
+  cat -- "$f" >/dev/null 2>&1 || true
+done < <(git ls-files -z)
+
+# If anything is STILL unreadable, git's view of the tree is untrustworthy and
+# we must not commit on top of it.
+stderr=$(git status --porcelain 2>&1 >/dev/null || true)
+if printf '%s' "$stderr" | grep -q 'Resource deadlock avoided'; then
+  printf '%s\n' "$stderr" >&2
+  die "iCloud has not released some files. Right-click the folder in Finder -> Keep Downloaded, wait for sync, and re-run."
+fi
+
+# --- what is there to ship? -------------------------------------------------
+
+new_scripts=()
+while IFS= read -r f; do
+  [ -n "$f" ] && new_scripts+=("$f")
+done < <(git ls-files --others --exclude-standard -- 'scripts/*.txt' 'scripts/*.md' \
+         | grep -E "$DATED" || true)
+
+changed_scripts=()
+while IFS= read -r f; do
+  [ -n "$f" ] && changed_scripts+=("$f")
+done < <(git diff --name-only -- 'scripts/*.txt' 'scripts/*.md' \
+         | grep -E "$DATED" || true)
+
+if [ ${#new_scripts[@]} -eq 0 ] && [ ${#changed_scripts[@]} -eq 0 ]; then
+  note "nothing to ship."
+  exit 0
+fi
+
+if [ ${#new_scripts[@]} -eq 0 ] && [ "$REPUBLISH" = 0 ]; then
+  note "no new episode. ${#changed_scripts[@]} already-published script(s) edited:"
+  for f in "${changed_scripts[@]}"; do note "  $f"; done
+  note "editing a published script republishes that episode. Re-run with --republish if that is what you want."
+  exit 0
+fi
+
+staging=("${new_scripts[@]}")
+[ "$REPUBLISH" = 1 ] && staging+=("${changed_scripts[@]}")
+
+# --- the two TTS checks the show spec requires ------------------------------
+#
+# CI will happily narrate "48-14" as digits and read asterisks aloud as nothing
+# at all. Catching it here costs a second; catching it after publication costs
+# a re-narration and a corrected feed entry.
+
+bad=0
+for f in "${staging[@]}"; do
+  if grep -qE '[—*#|]' -- "$f"; then
+    log "WARN: $f contains markdown or em-dash characters"; bad=1
+  fi
+  if grep -qE '[0-9]' -- "$f"; then
+    log "WARN: $f contains numerals; they must be spelled as spoken"; bad=1
+  fi
+  if ! grep -q '\[\[TRANSITION\]\]' -- "$f"; then
+    log "WARN: $f has no [[TRANSITION]] markers; it will narrate as one unbroken block"; bad=1
+  fi
+done
+
+if [ "$bad" = 1 ] && [ "$FORCE" = 0 ]; then
+  die "refusing to ship. Fix the above, or re-run with --force if you disagree."
+fi
+
+# --- ship -------------------------------------------------------------------
+
+episode=$(printf '%s\n' "${staging[@]}" | grep -oE "$DATED" | sort | tail -1)
+subject="Episode ${episode}"
+[ ${#new_scripts[@]} -eq 0 ] && subject="Republish ${episode}"
+
+log "shipping ${#staging[@]} file(s) as ${subject}:"
+for f in "${staging[@]}"; do log "  $f"; done
+
+if [ "$DRY" = 1 ]; then
+  log "dry run - nothing staged, committed or pushed."
+  exit 0
+fi
+
+# Explicit pathspecs. Never -A, never -u, never a bare dot.
+git add -- "${staging[@]}"
+
+# Belt and braces: if anything outside scripts/ made it into the index, stop.
+if git diff --cached --name-only | grep -qv '^scripts/'; then
+  git reset -q -- .
+  die "something outside scripts/ was staged. Index reset, nothing committed."
+fi
+
+git commit -q -m "$subject"
+log "committed $(git rev-parse --short HEAD)"
+
+git push -q origin main
+log "pushed. CI: https://github.com/jtdancy-jarvis/monday-brief-source/actions"
+log "feed:  https://jtdancy-jarvis.github.io/monday-brief/feed.xml"

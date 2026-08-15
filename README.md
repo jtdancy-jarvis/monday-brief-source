@@ -28,10 +28,19 @@ Monday 10:30 UTC  watchdog.yml checks the live feed has today's episode;
 
 Two repos, on purpose:
 
-- **`jtdancy-jarvis/monday-brief-source` (private, this folder).** Scripts,
-  publisher, mastering, assets, CI. Episode text never becomes public.
+- **`jtdancy-jarvis/monday-brief-source` (public since 2026-08-09, this
+  folder).** Scripts, publisher, mastering, assets, CI. It started private and
+  the split was originally justified by keeping episode text unpublished; that
+  is no longer true and the reason for two repos is now narrower — the feed repo
+  stays separate so 7.5 MB of audio a week does not accumulate alongside the
+  source, and so Pages serves only what it needs to.
 - **`jtdancy-jarvis/monday-brief` (public).** Only finished mp3s, `feed.xml`,
   `cover.jpg`. Public because free GitHub Pages only serves public repos.
+
+> **Everything tracked here is world-readable.** Name, email and city are in
+> tracked files by explicit decision. Family names, forward travel dates, payday
+> figures, health and account detail must never be committed — those belong in
+> `scripts-private/`, which is gitignored.
 
 Two script folders, on purpose:
 
@@ -44,10 +53,24 @@ Two script folders, on purpose:
 
 ## Weekly rhythm
 
-Nothing to do by hand. Sunday's producer session writes both cuts, pushes the
-public one, CI does the rest. Failures surface as GitHub issues on the source
-repo (publish failures from `publish.yml`, missing episodes from
+Sunday's producer session writes the public cut into `scripts/`. `./ship`
+commits and pushes it. CI does the rest. Failures surface as GitHub issues on
+the source repo (publish failures from `publish.yml`, missing episodes from
 `watchdog.yml`).
+
+**Who runs `./ship` depends on where the producer ran.** A session with git
+credentials pushes for itself. A scheduled/sandboxed run has none by design, so
+the push has to happen on the Mac — either by running `./ship` yourself, or by
+installing the launchd agent in `launchd/`, which watches `scripts/` and ships
+anything new. The agent is what makes the week genuinely hands-off; without it,
+one command on Monday morning is the whole manual step.
+
+`./ship` exists because `git add -A` is unsafe in this folder. It stages
+explicit paths under `scripts/` only, ships new episodes but requires
+`--republish` to re-push an edited one, and refuses text that fails the two TTS
+greps or has no `[[TRANSITION]]` markers. It also forces iCloud to materialise
+tracked files first and aborts if any are still evicted, rather than committing
+on top of a tree git cannot actually read.
 
 ## Manual operations
 
@@ -56,6 +79,12 @@ episode's slot in the feed, and an implicit "today" once overwrote a
 published episode.
 
 ```bash
+# Ship whatever new episode is sitting in scripts/ (the normal path):
+./ship
+./ship --dry-run      # show what would go, touch nothing
+./ship --republish    # also push edits to an already-published script
+./ship --force        # ship despite the TTS text warnings
+
 # Publish a specific script (what CI runs):
 ./publish.py --script scripts/monday-brief-2026-08-17.txt --date 2026-08-17
 
@@ -105,6 +134,18 @@ fixing a typo in a six-month-old script.
    ```
 3. The feed URL, already claimed on Spotify:
    `https://jtdancy-jarvis.github.io/monday-brief/feed.xml`
+4. Optional, for hands-off Mondays — the auto-ship agent:
+
+   ```bash
+   cp launchd/com.jtdancy.monday-brief.ship.plist ~/Library/LaunchAgents/
+   launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.jtdancy.monday-brief.ship.plist
+   launchctl enable  gui/$UID/com.jtdancy.monday-brief.ship
+   tail -f ~/Library/Logs/monday-brief-ship.log
+   ```
+
+   A LaunchAgent, not a daemon: it runs in the logged-in GUI session, which is
+   what lets git reach the login keychain for the push credential. The paths in
+   the plist are absolute — edit them on a machine that is not this one.
 
 ## Known limits
 
