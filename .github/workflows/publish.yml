@@ -70,21 +70,37 @@ jobs:
       # proof -- the feed repo is public, so read access means nothing here.
       # --dry-run contacts the server and runs the real permission check
       # without creating a commit.
-      - name: Preflight - can actually push, and Pages has headroom
+      - name: Preflight - both credentials work before any TTS spend
+        env:
+          GH_TOKEN: ${{ secrets.FEED_REPO_TOKEN }}
         run: |
           set -euo pipefail
-          if ! git -C repo push --dry-run origin HEAD:main 2>&1 | tee /tmp/push-check; then
-            echo "::error::Cannot push to jtdancy-jarvis/monday-brief. The FEED_DEPLOY_KEY secret and the repo's deploy key must be the two halves of one keypair, and the deploy key must be write-enabled (gh repo deploy-key list --repo jtdancy-jarvis/monday-brief)."
+
+          # 1. Deploy key (ssh) pushes feed.xml and the episode sidecar.
+          if ! git -C repo push --dry-run origin HEAD:main; then
+            echo "::error::Cannot push to jtdancy-jarvis/monday-brief. FEED_DEPLOY_KEY and the repo's deploy key must be two halves of one keypair, and the key must be write-enabled (gh repo deploy-key list --repo jtdancy-jarvis/monday-brief)."
             exit 1
           fi
-          echo "push access to the feed repo confirmed"
-          # GitHub Pages stops serving at 1 GB. ~7.5 MB/episode means the wall
-          # arrives on schedule; start warning at 700 MB.
-          kb=$(curl -s https://api.github.com/repos/jtdancy-jarvis/monday-brief | jq -r '.size // 0')
-          echo "feed repo size: $((kb / 1024)) MB"
-          if [ "$kb" -gt 716800 ]; then
-            echo "::warning::feed repo is over 700 MB of the 1 GB Pages limit. Time to plan the move to a real podcast host (Transistor/Buzzsprout/Captivate)."
+          echo "deploy key OK: can push feed.xml"
+
+          # 2. Token (REST) creates the Release that hosts the mp3. This is a
+          #    separate credential on purpose: releases are an API concept and
+          #    an ssh key cannot reach the API at all.
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::error::FEED_REPO_TOKEN is not set. Episode audio is hosted as a GitHub Release, which needs a REST token; the deploy key cannot create releases. Create a fine-grained PAT scoped to ONLY jtdancy-jarvis/monday-brief with Contents: Read and write, then: gh secret set FEED_REPO_TOKEN --repo jtdancy-jarvis/monday-brief-source"
+            exit 1
           fi
+          push=$(gh api repos/jtdancy-jarvis/monday-brief --jq '.permissions.push // false' 2>/dev/null || echo false)
+          if [ "$push" != "true" ]; then
+            echo "::error::FEED_REPO_TOKEN cannot write to jtdancy-jarvis/monday-brief, so 'gh release create' will fail after narration has already been paid for. Regenerate it: fine-grained PAT, repository access ONLY jtdancy-jarvis/monday-brief, permission Contents: Read and write. Then: gh secret set FEED_REPO_TOKEN --repo jtdancy-jarvis/monday-brief-source"
+            exit 1
+          fi
+          echo "token OK: can create releases on the feed repo"
+
+          # Pages only serves feed.xml and sidecars now -- audio lives on
+          # Releases and does not count. This should stay flat week to week.
+          kb=$(curl -s https://api.github.com/repos/jtdancy-jarvis/monday-brief | jq -r '.size // 0')
+          echo "feed repo size: $((kb / 1024)) MB (audio excluded; Releases do not count toward the 1 GB Pages limit)"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -156,6 +172,8 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
           DRY_RUN: ${{ inputs.dry_run }}
+          # publish.py shells out to `gh release create` to host the audio.
+          GH_TOKEN: ${{ secrets.FEED_REPO_TOKEN }}
         run: |
           set -euo pipefail
           ARGS=(--script "${{ steps.pick.outputs.script }}"
@@ -174,7 +192,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: episode-${{ steps.pick.outputs.date }}
-          path: repo/episodes/${{ steps.pick.outputs.date }}.mp3
+          # Audio is built in work/ and uploaded to a Release; it is no longer
+          # written into repo/episodes/. Still kept as an artifact so a run that
+          # dies after narration can be recovered without re-paying for TTS.
+          path: work/${{ steps.pick.outputs.date }}.mp3
           if-no-files-found: warn
           retention-days: 30
 

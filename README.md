@@ -15,10 +15,12 @@ Sunday ~5pm   Claude on the Mac follows SKILL-monday-brief.md
                                                    |
                           push to scripts/** triggers .github/workflows/publish.yml
                                                    v
-GitHub Actions   preflight (token can push, size headroom)   <- fails BEFORE TTS spend
+GitHub Actions   preflight (deploy key pushes, token releases)  <- fails BEFORE TTS spend
                  publish.py --script ... --date ...
-                   OpenAI TTS -> ffmpeg master (-16 LUFS) -> repo/episodes/YYYY-MM-DD.mp3
-                   rebuild feed.xml -> push to the public feed repo
+                   OpenAI TTS -> ffmpeg master (-16 LUFS) -> work/YYYY-MM-DD.mp3
+                   gh release create ep-YYYY-MM-DD  (hosts the audio)
+                   verify the asset downloads, THEN
+                   write episodes/YYYY-MM-DD.json + feed.xml -> push
                                                    v
 GitHub Pages     serves feed.xml  ->  Spotify / Apple / Overcast poll it
 
@@ -34,8 +36,20 @@ Two repos, on purpose:
   is no longer true and the reason for two repos is now narrower — the feed repo
   stays separate so 7.5 MB of audio a week does not accumulate alongside the
   source, and so Pages serves only what it needs to.
-- **`jtdancy-jarvis/monday-brief` (public).** Only finished mp3s, `feed.xml`,
-  `cover.jpg`. Public because free GitHub Pages only serves public repos.
+- **`jtdancy-jarvis/monday-brief` (public).** `feed.xml`, `cover.jpg`, and one
+  small `episodes/YYYY-MM-DD.json` sidecar per episode. Public because free
+  GitHub Pages only serves public repos.
+
+  **Audio lives on Releases, not in the repo.** Each episode is a release
+  tagged `ep-YYYY-MM-DD` whose single asset is the mp3. Release assets do not
+  count toward the 1 GB Pages limit and never enter git history, so the repo
+  stays flat instead of growing ~8 MB a week. Episodes published before this
+  change still serve from `episodes/*.mp3` on Pages; each sidecar records its
+  own `url`, so the two coexist and nothing had to be migrated.
+
+  Two credentials, because they do different jobs: the **deploy key** (ssh)
+  pushes `feed.xml`, and **`FEED_REPO_TOKEN`** (REST) creates the release. An
+  ssh key cannot reach the API, so releases genuinely need the token.
 
 > **Everything tracked here is world-readable.** Name, email and city are in
 > tracked files by explicit decision. Family names, forward travel dates, payday
@@ -176,10 +190,13 @@ decision.
 
 ## Known limits
 
-- **The 1 GB wall.** Pages stops serving at 1 GB; ~7.5 MB/episode ≈ 2.5 years
-  of runway. CI warns at 700 MB. The eventual fix is a real podcast host
-  (Transistor, Buzzsprout, Captivate) downstream of this same pipeline — they
-  also solve private feeds, which is the `scripts-private/` blocker.
+- **The 1 GB wall is no longer the binding constraint.** Audio moved to
+  Releases, so Pages now serves only `feed.xml` plus ~200-byte sidecars. The
+  ~50 MB already in the repo is the four pre-Release episodes and stays put.
+- **Release assets serve as `application/octet-stream`**, not `audio/mpeg`, and
+  GitHub does not let you change that. Clients use the `<enclosure type>` from
+  the feed, so Apple and Spotify are fine with it; it is worth knowing if a
+  strict validator ever complains.
 - **This folder lives in iCloud Drive.** Right-click → *Keep Downloaded*, or
   a git operation can hit a file that looks present but is evicted.
 - **TTS cost** is the only per-episode spend: roughly $0.10–0.30/week at

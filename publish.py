@@ -222,6 +222,59 @@ def duration_hms(path):
     return f"{secs // 3600:02d}:{secs % 3600 // 60:02d}:{secs % 60:02d}"
 
 
+# ---------------------------------------------------------------- releases
+
+def upload_release(mp3, date, title, cfg, dry_run):
+    """Host this episode's audio as a GitHub Release asset, return its URL.
+
+    Release assets do not count against the 1 GB GitHub Pages limit and never
+    enter git history, so the feed repo stops growing by ~8 MB a week.
+
+    Authenticated by GH_TOKEN, not the deploy key: releases are a REST API
+    concept and ssh keys cannot reach the API at all.
+    """
+    need("gh")
+    gh_cfg = cfg["github"]
+    slug = f"{gh_cfg['username']}/{gh_cfg['repo']}"
+    tag = f"ep-{date}"
+    url = f"https://github.com/{slug}/releases/download/{tag}/{mp3.name}"
+
+    if dry_run:
+        print(f"  [dry run] would upload {mp3.name} to release {tag}")
+        return url
+
+    exists = run(["gh", "release", "view", tag, "--repo", slug],
+                 check=False).returncode == 0
+    if exists:
+        # Republishing an edited episode: replace the asset in place so the
+        # enclosure URL, and every listener's download link, stays valid.
+        print(f"  release {tag} exists, replacing asset")
+        run(["gh", "release", "upload", tag, str(mp3),
+             "--repo", slug, "--clobber"])
+    else:
+        run(["gh", "release", "create", tag, str(mp3),
+             "--repo", slug,
+             "--title", title,
+             "--notes", f"Audio for {title}. Published automatically; the feed "
+                        f"at {gh_cfg['username']}.github.io/{gh_cfg['repo']}/"
+                        f"feed.xml is the thing to subscribe to."])
+        print(f"  release {tag} created")
+
+    # Never let feed.xml reference an asset that is not actually downloadable.
+    # A dead enclosure is worse than a missing item: clients cache and retry it,
+    # and Apple and Spotify flag the show for it.
+    try:
+        req = urllib.request.Request(url, method="HEAD")
+        with urllib.request.urlopen(req, timeout=120) as r:
+            if r.status != 200:
+                die(f"release asset returned {r.status}: {url}")
+    except urllib.error.URLError as e:
+        die(f"release asset is not reachable, refusing to write it into the "
+            f"feed: {url} ({e})")
+    print(f"  asset verified: {url}")
+    return url
+
+
 # ---------------------------------------------------------------- feed
 
 def build_feed(cfg, repo_dir):
@@ -270,17 +323,29 @@ def build_feed(cfg, repo_dir):
         ET.SubElement(cat, f"{{{ITUNES}}}category",
                       {"text": pod["subcategory"]})
 
-    eps = sorted((repo_dir / "episodes").glob("*.mp3"),
+    # The .json sidecar is the source of truth, not the .mp3. Episode audio
+    # lives on Releases now and is never checked out here, so the feed has to
+    # be buildable without it. Sidecars are a couple of hundred bytes each.
+    eps = sorted((repo_dir / "episodes").glob("*.json"),
                  key=lambda p: p.stem, reverse=True)
     if not eps:
-        die("no episodes found in repo/episodes/")
+        die("no episode metadata (*.json) found in repo/episodes/")
 
-    for mp3 in eps:
-        meta_path = mp3.with_suffix(".json")
-        meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
-        date = dt.datetime.strptime(mp3.stem, "%Y-%m-%d").replace(
+    for meta_path in eps:
+        meta = json.loads(meta_path.read_text())
+        date = dt.datetime.strptime(meta_path.stem, "%Y-%m-%d").replace(
             hour=9, tzinfo=dt.timezone.utc)
-        url = f"{base}/episodes/{mp3.name}"
+
+        # url and length are recorded at publish time, because only the
+        # publishing run has the audio in hand. Episodes published before the
+        # move to Releases have their mp3 sitting beside them instead.
+        url, length = meta.get("url"), meta.get("length")
+        mp3 = meta_path.with_suffix(".mp3")
+        if not url or not length:
+            if not mp3.exists():
+                die(f"{meta_path.name} has no url/length and no mp3 beside it")
+            url = url or f"{base}/episodes/{mp3.name}"
+            length = length or mp3.stat().st_size
 
         it = ET.SubElement(ch, "item")
         sub(it, "title", meta.get("title",
@@ -289,7 +354,7 @@ def build_feed(cfg, repo_dir):
         sub(it, "pubDate", email.utils.format_datetime(date))
         ET.SubElement(it, "enclosure", {
             "url": url,
-            "length": str(mp3.stat().st_size),
+            "length": str(length),
             "type": "audio/mpeg"})
 
         # The GUID is the episode's identity to every podcast client, and it is
@@ -300,9 +365,9 @@ def build_feed(cfg, repo_dir):
         # move anywhere and subscribers never notice.
         #
         # Changing guid_prefix re-issues the whole back catalogue. Don't.
-        sub(it, "guid", f"{guid_prefix}-{mp3.stem}", isPermaLink="false")
+        sub(it, "guid", f"{guid_prefix}-{meta_path.stem}", isPermaLink="false")
         sub(it, f"{{{ITUNES}}}duration",
-            meta.get("duration") or duration_hms(mp3))
+            meta.get("duration") or duration_hms(mp3))  # mp3 only for pre-Release episodes
         sub(it, f"{{{ITUNES}}}explicit", pod["explicit"])
         sub(it, f"{{{ITUNES}}}episodeType", "full")
 
@@ -381,7 +446,11 @@ def main():
     except ValueError:
         die(f"--date must be YYYY-MM-DD, got {date!r}")
 
-    dest = repo_dir / "episodes" / f"{date}.mp3"
+    # Audio is built in work/ and uploaded as a Release asset. It deliberately
+    # never lands in repo/episodes/ any more -- committing it there is what put
+    # the feed repo on course for the 1 GB Pages wall. Only the .json sidecar
+    # and feed.xml get committed.
+    dest = work / f"{date}.mp3"
 
     # --- get the audio -------------------------------------------------
     if args.audio:
@@ -453,14 +522,23 @@ def main():
         description = " ".join(spoken.split()[:60]) + "…"
 
     dur = duration_hms(dest)
-    size_mb = dest.stat().st_size / 1e6
-    print(f"  episode: {dest.name}  {dur}  {size_mb:.1f} MB")
+    length = dest.stat().st_size
+    print(f"  episode: {dest.name}  {dur}  {length / 1e6:.1f} MB")
 
-    dest.with_suffix(".json").write_text(json.dumps({
-        "title": args.title or f"{cfg['podcast']['title']} — "
-                               f"{dt.datetime.strptime(date, '%Y-%m-%d'):%B %-d, %Y}",
+    title = (args.title or f"{cfg['podcast']['title']} — "
+             f"{dt.datetime.strptime(date, '%Y-%m-%d'):%B %-d, %Y}")
+
+    # Upload BEFORE writing the sidecar and rebuilding the feed. If this fails,
+    # the run dies here with the feed untouched -- far better than committing a
+    # feed entry whose audio does not exist.
+    url = upload_release(dest, date, title, cfg, args.dry_run)
+
+    (repo_dir / "episodes" / f"{date}.json").write_text(json.dumps({
+        "title": title,
         "description": description,
         "duration": dur,
+        "url": url,
+        "length": length,
     }, indent=2) + "\n")
 
     # --- feed + push ---------------------------------------------------
