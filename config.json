@@ -14,7 +14,8 @@
     "category": "Society & Culture",
     "subcategory": "Documentary",
     "explicit": "false",
-    "copyright": "Tyler Dancy"
+    "copyright": "Tyler Dancy",
+    "guid_prefix": "monday-brief"
   },
   "tts": {
     "model": "gpt-4o-mini-tts",

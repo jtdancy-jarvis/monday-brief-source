@@ -102,6 +102,33 @@ Editing an old script and pushing it republishes that episode: same filename
 date, same feed slot, same GUID. Usually what you want; worth knowing before
 fixing a typo in a six-month-old script.
 
+### Episode GUIDs — the one thing not to break
+
+Each item's `<guid>` is `monday-brief-YYYY-MM-DD` with `isPermaLink="false"`.
+It is deliberately **not** the enclosure URL.
+
+A GUID is an episode's identity to every podcast client. When it was the
+enclosure URL, changing where audio lived — GitHub Releases, or a real podcast
+host — rewrote every GUID and re-issued the entire back catalogue as unheard
+episodes in every subscriber's app. Decoupled, the audio can move anywhere and
+nobody notices.
+
+So: `podcast.guid_prefix` in `config.json` is frozen. Renaming the show, the
+repo, or the GitHub account is all safe. Changing that prefix is not.
+
+### Changing feed metadata without re-narrating
+
+Show title, description, artwork, category — anything feed-wide — takes effect
+by rebuilding the feed from the episodes already published:
+
+```bash
+./publish.py --feed-only --dry-run   # inspect repo/feed.xml first
+./publish.py --feed-only             # rebuild and push
+```
+
+No TTS, no audio, no new episode. This is the path for the pending show-name
+decision.
+
 ## Recovery
 
 - **CI failed after narration?** The mastered mp3 is attached to the run as an

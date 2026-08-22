@@ -228,6 +228,10 @@ def build_feed(cfg, repo_dir):
     gh, pod = cfg["github"], cfg["podcast"]
     base = f"https://{gh['username']}.github.io/{gh['repo']}"
 
+    # Frozen, and intentionally not derived from the repo or show name: both of
+    # those can change, and a GUID that changes is a re-issued back catalogue.
+    guid_prefix = pod.get("guid_prefix", "monday-brief")
+
     ET.register_namespace("itunes", ITUNES)
     ET.register_namespace("atom", ATOM)
     ET.register_namespace("content", CONTENT)
@@ -287,7 +291,16 @@ def build_feed(cfg, repo_dir):
             "url": url,
             "length": str(mp3.stat().st_size),
             "type": "audio/mpeg"})
-        sub(it, "guid", url, isPermaLink="true")
+
+        # The GUID is the episode's identity to every podcast client, and it is
+        # deliberately NOT the enclosure URL. When it was the URL, any change of
+        # host -- GitHub Releases, or a real podcast host later -- rewrote every
+        # GUID and re-issued the entire back catalogue as unheard episodes in
+        # every subscriber's app. Derived from the date instead, the audio can
+        # move anywhere and subscribers never notice.
+        #
+        # Changing guid_prefix re-issues the whole back catalogue. Don't.
+        sub(it, "guid", f"{guid_prefix}-{mp3.stem}", isPermaLink="false")
         sub(it, f"{{{ITUNES}}}duration",
             meta.get("duration") or duration_hms(mp3))
         sub(it, f"{{{ITUNES}}}explicit", pod["explicit"])
@@ -301,7 +314,7 @@ def build_feed(cfg, repo_dir):
 
 # ---------------------------------------------------------------- git
 
-def git_push(repo_dir, date, dry_run):
+def git_push(repo_dir, date, dry_run, message=None):
     if not (repo_dir / ".git").exists():
         die(f"{repo_dir} is not a git repo -- run ./setup.sh first")
     run(["git", "add", "-A"], cwd=repo_dir)
@@ -313,7 +326,7 @@ def git_push(repo_dir, date, dry_run):
         print("  [dry run] would commit and push:")
         print("   ", status.replace("\n", "\n    "))
         return
-    run(["git", "commit", "-m", f"Episode {date}"], cwd=repo_dir)
+    run(["git", "commit", "-m", message or f"Episode {date}"], cwd=repo_dir)
     run(["git", "push"], cwd=repo_dir)
     print("  pushed")
 
@@ -328,6 +341,9 @@ def main():
     ap.add_argument("--script", help="path to a specific script file")
     ap.add_argument("--title", help="episode title")
     ap.add_argument("--date", help="episode date, YYYY-MM-DD (required)")
+    ap.add_argument("--feed-only", action="store_true",
+                    help="rebuild feed.xml from the episodes already published "
+                         "and push it; no TTS, no audio, no new episode")
     args = ap.parse_args()
 
     need("ffmpeg")
@@ -340,6 +356,19 @@ def main():
     work = ROOT / paths["work_dir"]
     work.mkdir(exist_ok=True)
     (repo_dir / "episodes").mkdir(parents=True, exist_ok=True)
+
+    # Changing feed-wide metadata -- the show title, the GUID scheme -- has to
+    # reach the live feed without re-narrating the back catalogue at TTS cost.
+    if args.feed_only:
+        count, base = build_feed(cfg, repo_dir)
+        print(f"  feed.xml rebuilt with {count} episode(s), no audio touched")
+        git_push(repo_dir, None, args.dry_run,
+                 message="Rebuild feed.xml (metadata only, no new episode)")
+        print()
+        print(f"  feed:  {base}/feed.xml")
+        if args.dry_run:
+            print("  (dry run -- nothing was pushed)")
+        return
 
     # The date names the episode's slot in the feed. Defaulting it to "today"
     # once overwrote a published episode when a test ran on the wrong day, so
