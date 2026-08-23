@@ -90,12 +90,22 @@ jobs:
             echo "::error::FEED_REPO_TOKEN is not set. Episode audio is hosted as a GitHub Release, which needs a REST token; the deploy key cannot create releases. Create a fine-grained PAT scoped to ONLY jtdancy-jarvis/monday-brief with Contents: Read and write, then: gh secret set FEED_REPO_TOKEN --repo jtdancy-jarvis/monday-brief-source"
             exit 1
           fi
-          push=$(gh api repos/jtdancy-jarvis/monday-brief --jq '.permissions.push // false' 2>/dev/null || echo false)
-          if [ "$push" != "true" ]; then
-            echo "::error::FEED_REPO_TOKEN cannot write to jtdancy-jarvis/monday-brief, so 'gh release create' will fail after narration has already been paid for. Regenerate it: fine-grained PAT, repository access ONLY jtdancy-jarvis/monday-brief, permission Contents: Read and write. Then: gh secret set FEED_REPO_TOKEN --repo jtdancy-jarvis/monday-brief-source"
+          #    Probe by actually creating a draft release and deleting it.
+          #    Asking the API for .permissions.push does NOT work here: that
+          #    field reports the authenticated USER's access to the repo, which
+          #    is true for the owner no matter how narrowly the token itself is
+          #    scoped. It passed while the token could not create releases, and
+          #    the run died on HTTP 403 with a full episode already narrated
+          #    and paid for. Only a real write proves write.
+          probe="preflight-$(date +%s)"
+          if ! gh release create "$probe" \
+                 --repo jtdancy-jarvis/monday-brief \
+                 --draft --notes "preflight probe, deleted immediately" >/dev/null 2>&1; then
+            echo "::error::FEED_REPO_TOKEN cannot create releases on jtdancy-jarvis/monday-brief, so the audio has nowhere to go. Give the fine-grained PAT repository access to jtdancy-jarvis/monday-brief with permission Contents: Read and write (Contents is what governs releases), then: gh secret set FEED_REPO_TOKEN --repo jtdancy-jarvis/monday-brief-source"
             exit 1
           fi
-          echo "token OK: can create releases on the feed repo"
+          gh release delete "$probe" --repo jtdancy-jarvis/monday-brief --yes >/dev/null 2>&1 || true
+          echo "token OK: created and deleted a draft release"
 
           # Pages only serves feed.xml and sidecars now -- audio lives on
           # Releases and does not count. This should stay flat week to week.
