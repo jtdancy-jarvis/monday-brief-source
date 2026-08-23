@@ -105,7 +105,13 @@ jobs:
           if ! gh release create "$probe" \
                  --repo jtdancy-jarvis/monday-brief \
                  --draft --notes "preflight probe, deleted immediately" >/dev/null 2>&1; then
-            echo "::error::FEED_REPO_TOKEN cannot create releases on jtdancy-jarvis/monday-brief, so the audio has nowhere to go. Give the fine-grained PAT repository access to jtdancy-jarvis/monday-brief with permission Contents: Read and write (Contents is what governs releases), then: gh secret set FEED_REPO_TOKEN --repo jtdancy-jarvis/monday-brief-source"
+            # Distinguish the two ways this goes wrong, because they are fixed
+            # on different screens and the error is otherwise a guess.
+            if gh api repos/jtdancy-jarvis/monday-brief --silent >/dev/null 2>&1; then
+              echo "::error::FEED_REPO_TOKEN can SEE jtdancy-jarvis/monday-brief but cannot create releases there. So 'Repository access' is right and the permission is wrong: on the token, set Permissions -> Repository permissions -> Contents to 'Read and write' (Contents governs releases; 'Read-only' is not enough). Then: gh secret set FEED_REPO_TOKEN --repo jtdancy-jarvis/monday-brief-source"
+            else
+              echo "::error::FEED_REPO_TOKEN cannot even read jtdancy-jarvis/monday-brief, so it is not scoped to that repository. On the token, set 'Repository access' -> 'Only select repositories' and pick jtdancy-jarvis/monday-brief (note: monday-brief, NOT monday-brief-source -- the audio is published to the public feed repo). Then: gh secret set FEED_REPO_TOKEN --repo jtdancy-jarvis/monday-brief-source"
+            fi
             exit 1
           fi
           gh release delete "$probe" --repo jtdancy-jarvis/monday-brief --yes >/dev/null 2>&1 || true
