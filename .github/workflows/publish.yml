@@ -24,7 +24,11 @@ on:
         description: 'Episode date YYYY-MM-DD (blank = read it off the filename)'
         required: false
       dry_run:
-        description: 'Build and master, but do not push to the feed'
+        description: 'Build and master, but do not push to the feed (still narrates, still costs TTS)'
+        type: boolean
+        default: false
+      preflight_only:
+        description: 'Only check the credentials, then stop. Costs nothing.'
         type: boolean
         default: false
 
@@ -113,11 +117,13 @@ jobs:
           echo "feed repo size: $((kb / 1024)) MB (audio excluded; Releases do not count toward the 1 GB Pages limit)"
 
       - name: Set up Python
+        if: ${{ !inputs.preflight_only }}
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Install ffmpeg
+        if: ${{ !inputs.preflight_only }}
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
@@ -129,6 +135,7 @@ jobs:
       # gives every file the same mtime and the "newest" script is arbitrary.
       # So we choose explicitly, by the date embedded in the filename.
       - name: Choose script and episode date
+        if: ${{ !inputs.preflight_only }}
         id: pick
         run: |
           python3 - <<'PY'
@@ -173,11 +180,13 @@ jobs:
           IN_DATE: ${{ inputs.date }}
 
       - name: Configure commit identity on the feed repo
+        if: ${{ !inputs.preflight_only }}
         run: |
           git -C repo config user.name  "monday-brief-bot"
           git -C repo config user.email "jtdancy@gmail.com"
 
       - name: Narrate, master, rebuild feed, push
+        if: ${{ !inputs.preflight_only }}
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
