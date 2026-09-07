@@ -337,7 +337,8 @@ The shape of a run:
 1. **Load.** `list_drafts` with query `subject:"JARVIS Content Memory"` returns
    id and full body in one call. Strip `\r`, `JSON.parse`. Gmail rewrites bare
    URLs into `google.com/url?q=<real>` redirects — unwrap the `q` param on read,
-   write them bare and expect it to happen again.
+   write them bare and expect it to happen again. **Record the `schema` number
+   you read.** You will need it in step 8.
 2. **If the body will not parse, STOP.** Do not overwrite it. Restore from the
    Weekly Queue artifact's mirror (`<script id="jarvis-memory-mirror">`), repair,
    and say so in chat. Never write a guessed object over memory.
@@ -355,7 +356,21 @@ The shape of a run:
 7. **Write `week_picks`** — `{id, medium, subject, title, src, url, mins, slot,
    why, surfaces}`. `why` is reused verbatim by the Queue, so write it to be
    read as well as heard.
-8. **Write memory back** with `update_draft` on the same id. Never create a
+8. **Re-verify before writing.** Immediately before the `update_draft` call,
+   re-fetch the draft with a fresh `list_drafts` and check its `schema` number
+   against the one you recorded in step 1. If it has changed, **STOP — do not
+   write.** Something else touched this draft while you were working: another
+   session, a concurrent scheduled run, or a stale Gmail browser tab
+   autosaving over it are all real causes, not hypothetical ones. Overwriting
+   now either silently discards whatever that other write added, or buries it
+   under yours with no record either way. Say so loudly in chat, name both
+   schema numbers, and leave it for a human or the next session to reconcile
+   deliberately — the same posture as step 2's unparseable-body case. This
+   guard exists because of 2026-08-23: a producer run's schema-21 read was
+   found overwritten by schema-19 content sometime in the following three
+   days, cause never conclusively identified. See
+   `threads.open.memory-write-regression-2026-08-22` in memory for the writeup.
+9. **Write memory back** with `update_draft` on the same id. Never create a
    second draft. Carry every key forward, preserve `_readme` and `_rule`
    verbatim. Then **re-apply the label** — `update_draft` moves the draft to a
    new thread and drops labels. `list_drafts` again for the new `threadId`, then
@@ -384,6 +399,20 @@ The shape of a run:
 ---
 
 ## CHANGELOG
+
+**2026-08-23** — Added a re-verify-before-write guard to the memory protocol
+(now step 8). A producer session found the `JARVIS Content Memory` draft had
+regressed from schema 21 to schema 19 sometime in the three days after it was
+last read that way — same draft id, new thread/message id, older content under
+a newer timestamp, meaning a real write happened, not a caching artifact.
+Traced through every plausibly-connected session in that window and could not
+identify the writer; concurrent Claude sessions and a stale Gmail browser tab
+autosaving over the draft are both live hypotheses, neither confirmed. Rather
+than leave the gap unguarded, every write now re-checks the draft's schema
+number immediately before committing and refuses to overwrite if it moved
+since the run started reading. See `threads.open.memory-write-regression-2026-08-22`
+in memory for the full incident writeup and the restore that followed it
+(schema 22).
 
 **2026-08-17** — Collapsed to a single episode format. Tyler answered
 `private-hosting` NO on 2026-08-11 (public-only is enough, no personal feed

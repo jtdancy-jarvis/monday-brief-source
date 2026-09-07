@@ -1,6 +1,12 @@
-# Monday Brief — episode ledger
+# Monday Brief — episode ledger (ARCHIVE, do not read for live decisions)
 
-> **SUPERSEDED for dedupe purposes, 2026-08-04.** Every pick below has been
+> **FULLY SUPERSEDED 2026-08-07.** Frozen as of the 2026-08-10 episode. Nothing
+> further will be appended here. Continuity now lives entirely in the `ledger`
+> and `threads` arrays of the **JARVIS Content Memory** Gmail draft, which spans
+> both the podcast and the Weekly Queue. `SKILL-monday-brief.md` is the show
+> spec. This file is a human-readable history and a restore source, nothing more.
+
+> **Superseded for dedupe purposes, 2026-08-04.** Every pick below has been
 > merged into the `ledger` array in the **JARVIS Content Memory** Gmail draft,
 > which now spans both the podcast and the Weekly Queue. The follow-ups section
 > has been merged into that draft's `threads`.
