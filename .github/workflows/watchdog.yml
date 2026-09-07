@@ -26,31 +26,53 @@ jobs:
         run: |
           python3 - <<'PY'
           import datetime as dt
-          import re
+          import email.utils
           import sys
           import urllib.request
+          import xml.etree.ElementTree as ET
 
           FEED = "https://jtdancy-jarvis.github.io/monday-brief/feed.xml"
           today = dt.datetime.now(dt.timezone.utc).date()
 
           try:
               with urllib.request.urlopen(FEED, timeout=60) as r:
-                  xml = r.read().decode()
+                  xml = r.read()
           except Exception as e:
               print(f"::error::could not fetch {FEED}: {e}")
               sys.exit(1)
 
-          # Enclosure URLs embed the episode date; the first item is newest.
-          m = re.search(r"episodes/(\d{4}-\d{2}-\d{2})\.mp3", xml)
-          if not m:
-              print("::error::no episode found in the feed at all")
+          # Parse the feed rather than pattern-matching enclosure URLs. The URL
+          # used to embed the date ("episodes/YYYY-MM-DD.mp3"), so a regex
+          # worked -- until audio moved to Releases, whose URLs look like
+          # "releases/download/ep-DATE/DATE.mp3" and contain no "episodes/" at
+          # all. The old regex then silently matched only the pre-Releases
+          # episodes and reported a months-old one as newest, failing every
+          # Monday and crying wolf. pubDate is the feed's own answer to "when
+          # is this episode from" and survives any future change of host.
+          try:
+              items = ET.fromstring(xml).find("channel").findall("item")
+          except Exception as e:
+              print(f"::error::feed is not parseable XML: {e}")
               sys.exit(1)
 
-          newest = dt.date.fromisoformat(m.group(1))
+          if not items:
+              print("::error::no episodes in the feed at all")
+              sys.exit(1)
+
+          dates = []
+          for it in items:
+              pub = it.findtext("pubDate")
+              if pub:
+                  dates.append(email.utils.parsedate_to_datetime(pub).date())
+          if not dates:
+              print("::error::no item in the feed has a pubDate")
+              sys.exit(1)
+
+          newest = max(dates)
           if newest < today:
               print(f"::error::newest episode is {newest}, expected {today}")
               sys.exit(1)
-          print(f"feed is fresh: newest episode {newest}")
+          print(f"feed is fresh: newest episode {newest} ({len(items)} items)")
           PY
 
       - name: Open an issue if the feed is stale
