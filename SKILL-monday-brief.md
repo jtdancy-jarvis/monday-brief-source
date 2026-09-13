@@ -297,12 +297,22 @@ before the text reaches the narrator, so they are never spoken.
 
 Each on its own line, blank line either side.
 
-- `[[TRANSITION]]` — a short music sting. **One before each major segment.**
-  Never inside a segment.
-- `[[PAUSE]]` — 0.55s. Before a line that should land. Two or three an episode.
+- `[[TRANSITION]]` — a short music sting, padded with 0.35s of silence on each
+  side so the music registers as a break rather than a blip against the next
+  line of speech. **One before each major segment.** Never inside a segment.
+- `[[PAUSE]]` — 0.85s. Before a line that should land. Two or three an episode.
   Overused, it sounds portentous.
-- `[[BEAT]]` — 1.1s. A longer hold. Once an episode at most, usually before the
+- `[[BEAT]]` — 1.7s. A longer hold. Once an episode at most, usually before the
   sign-off.
+
+Revised 2026-09-13, after Tyler reported the original timings (0.55s /
+1.1s / no padding around the sting) read as clipped and abrupt on actual
+TTS output. The sting's "air either side" had been documented since this
+file's first version but never implemented — a transition used to land with
+zero silence before or after it, which is most of why it read as rushed.
+`audio_post.py`'s own docstring and `MARKERS`/`STING_PAD` constants are the
+source of truth for the exact numbers; this file states them for reference
+only, and the two must not drift again.
 
 **A script with zero markers narrates as one unbroken block.** That is a real
 quality loss and it is the default failure — the 2026-08-10 episode shipped
@@ -314,7 +324,12 @@ tl=audio_post.build_timeline(pathlib.Path('SCRIPT').read_text());\
 print('non-speech blocks:', sum(1 for k,_ in tl if k!='speech'))"
 ```
 
-Expect roughly six or seven — one sting per segment, plus a couple of holds.
+Each `[[TRANSITION]]` now expands to three non-speech blocks (silence, sting,
+silence) instead of one, so the total is higher than it used to be. For a
+typical episode — five section transitions plus two or three pauses and one
+beat — expect roughly eighteen to twenty, not six or seven. What to actually
+check is the marker count in the raw script text (five transitions, two or
+three pauses, at most one beat), not the expanded block count.
 
 ### Emphasis
 
@@ -399,6 +414,23 @@ The shape of a run:
 ---
 
 ## CHANGELOG
+
+**2026-09-13** — Fixed pause and transition timing in `audio_post.py` after
+Tyler reported the 2026-09-14 episode's pauses and transitions read as too
+quick on actual TTS output. `[[PAUSE]]` raised 0.55s to 0.85s, `[[BEAT]]`
+raised 1.1s to 1.7s. `[[TRANSITION]]` now pads 0.35s of silence on each side
+of the sting in `build_timeline()` — this file's own docstring had promised
+"air either side" since the very first version, but the code never actually
+added any, so a sting used to land with zero silence before or after it and
+cut directly against speech. That padding, not just the sting-music length,
+was most of what made transitions feel abrupt. Updated the "Pause and
+transition markers" section and its verification snippet accordingly: each
+transition now expands to three non-speech blocks instead of one, so the
+expected total block count moved from "roughly six or seven" to "roughly
+eighteen to twenty" for a typical episode. No script text needed to change —
+this is a rendering-time fix, not an authoring one, so it applies retroactively
+to any already-written script the next time it's rendered to audio, including
+2026-09-14's.
 
 **2026-08-23** — Added a re-verify-before-write guard to the memory protocol
 (now step 8). A producer session found the `JARVIS Content Memory` draft had

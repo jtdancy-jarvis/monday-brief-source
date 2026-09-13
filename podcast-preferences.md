@@ -76,6 +76,8 @@ drafting. `ASKED` means it went out and no answer has landed yet.
 | When do you actually read — night, commute, or weekend stretches | Books | 2026-08-31 | **ASKED** | — |
 | Do you want the Monday page at all, or is this show enough | Behaviour | 2026-09-07 | **ASKED** | — |
 | Is there a comedy you keep returning to, and what does it do | Tone | 2026-09-07 | **ASKED** | — |
+| Should the Panthers get real week to week coverage, or stay a one line clause | Sports | 2026-09-14 | **ASKED** | — |
+| Do you prefer a show with a real ending, or something ongoing | Structure | 2026-09-14 | **ASKED** | — |
 
 ---
 
@@ -141,6 +143,23 @@ button can reach them)*
 ---
 
 ## REFINEMENT LOG
+
+### 2026-09-14 (scheduled producer run)
+
+Two questions asked on air:
+
+1. **Should the Panthers get real week to week coverage once the season is underway, or stay a one line clause?** (Sports) — never asked before, straight from the bank. Football has been leading the sports segment by the inside-three-weeks rule since the season opened; this asks whether that should extend into deeper Panthers coverage specifically.
+2. **Do you prefer a show with a real ending you can see coming, or something ongoing you can keep returning to for years?** (Structure) — never asked before. Serves how the watch slot gets pitched; last Structure-category ask was 2026-08-05.
+
+Categories rotated (Sports, Structure); neither used the week before (2026-09-07 used Behaviour and Tone). Neither question repeats one asked in the last eight weeks. `See How They Run` and the Monday-page/delivery-channel question were both deliberately **not** re-asked this week — both are still open but were asked too recently to repeat.
+
+**Full three-pick slate**, all three verified against primary sources this run: Sidedoor's "High Art, Low Ride" (32 min, Smithsonian, lowrider history — first designed-places pick that's a vehicle rather than a building) for LISTEN; *Magic Journey* by Kevin Rafferty (40-year Imagineering memoir) for READ, with an explicit on-air caveat that its audiobook edition and hook speed could not be confirmed this run; *The Good Place* season one (Netflix) for WATCH, the second Schur-lane data point after *A Man on the Inside*. AI and technology ran: Anthropic's fourth disclosed Claude security incident (Reuters), a real capability/security story that clears the bar on its own terms — the company missed its own earlier incident for seven months.
+
+A golf podcast episode named in the draft's `ask_queue` (`just-the-tips-tot-hill-strantz`, about Tot Hill Farm) could **not** be verified via web search this run — no confirmed runtime or even confirmed existence of the specific episode — so it was excluded rather than pitched with a guessed runtime, per "unconfirmed means excluded, not hedged."
+
+**MEMORY WAS NOT WRITTEN BACK, for (at minimum) the fourth week running.** The `JARVIS Content Memory` draft is schema 27 (last touched 2026-09-07), and its `plaintextBody` is confirmed between 70,000 and 90,000 characters against the draft's own stated 75,000-character ceiling — still at or over it. Gmail's HTML-duplicate-body problem means a single fetch is 170,000+ characters, over this session's per-call limit every time; the only way to read it at all was chained 250-to-300-character `grep -o` windows. Reconstructing that from fragments and submitting it via `update_draft` risks silent corruption at chunk boundaries, which is exactly what "never write a guessed object over memory" forbids. Declined, nothing overwritten. Full intended payload, plus a significant finding, is at `work/week-picks-2026-09-14.json`.
+
+**The significant finding:** the live draft's `ledger_index`, `week_picks`, and `ask_queue` are stale relative to what has actually aired, going back to at least 2026-08-24. Cross-checked against the scripts on disk and the published git history (`ep-2026-08-24`, `ep-2026-08-31`, `ep-2026-09-07` tags all live on the public repo): the real WATCH-hold count is one week, not the four the draft implies, and at least twelve of the twenty-one items in `ask_queue` are asks about titles that have already aired and should have been tombstoned. This looks like a consequence of the same size-ceiling failure — plan-stage state from mid-week never got overwritten with what was actually decided and aired later. Detailed line-by-line comparison is in the work file. **The Drive migration for the live memory object itself (not just the monthly history archive, which is already done) is now overdue** — this is the fourth consecutive run blocked by the same ceiling.
 
 ### 2026-09-07 (scheduled producer run)
 

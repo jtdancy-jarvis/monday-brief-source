@@ -17,9 +17,18 @@ CLI:
   ./audio_post.py measure file.mp3         report integrated LUFS and true peak
 
 Markers understood in scripts (stripped before they reach TTS):
-  [[PAUSE]]        0.55s beat
-  [[BEAT]]         1.1s  longer hold
-  [[TRANSITION]]   section sting with air either side
+  [[PAUSE]]        0.85s beat
+  [[BEAT]]         1.7s  longer hold
+  [[TRANSITION]]   section sting, padded with 0.35s of silence on each side
+                   so the music has room to register as a break rather than
+                   a blip mashed against the next line of speech
+
+Revised 2026-09-13: the original timings (0.55s / 1.1s / no padding around
+the sting) read as clipped and abrupt on actual TTS output -- reported by
+Tyler after the 2026-09-14 episode. Padding around the sting is new; it was
+promised in this docstring from the start ("air either side") but never
+actually implemented, so a sting used to land with zero silence before or
+after it.
 """
 
 import array
@@ -76,9 +85,14 @@ VOICE_CHAIN = (
 )
 
 MARKERS = {
-    "[[PAUSE]]": 0.55,
-    "[[BEAT]]": 1.10,
+    "[[PAUSE]]": 0.85,
+    "[[BEAT]]": 1.70,
 }
+# Silence padded onto each side of a [[TRANSITION]] sting. Without this the
+# music cuts in and out directly against speech, which is what read as
+# "too quick" -- the sting itself is only ~1s of music, so with no air around
+# it the whole transition was over before a listener registered it as a break.
+STING_PAD = 0.35
 MARKER_RE = re.compile(r"\[\[(PAUSE|BEAT|TRANSITION)\]\]")
 
 
@@ -216,7 +230,12 @@ def build_timeline(text):
             parts.append(("speech", chunk))
         tok = m.group(0)
         if tok == "[[TRANSITION]]":
+            # Air on both sides of the music, not just the music itself --
+            # otherwise it cuts in and out directly against speech and reads
+            # as a blip rather than a break.
+            parts.append(("silence", STING_PAD))
             parts.append(("sting", None))
+            parts.append(("silence", STING_PAD))
         else:
             parts.append(("silence", MARKERS[tok]))
         pos = m.end()
