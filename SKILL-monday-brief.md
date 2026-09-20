@@ -1,10 +1,13 @@
 # Monday Brief — canonical show spec
 
 **This file is the single source of truth for HOW the show is made.**
-Superseded 2026-08-07: merged from this file's previous contents and the
-scheduled-task prompt, which had drifted apart on six points.
 
-Tyler Dancy, Kannapolis NC (America/New_York). A personal weekly podcast,
+Restructured 2026-09-15, at Tyler's direction: the podcast is now an
+appointments-shape-plus-news recap only. Culture picks (watch/read/listen)
+moved out entirely, to a weekly email — see `_moved_to_weekly_queue` below.
+Superseded the 2026-08-07 merge, which had this show carrying the picks.
+
+Tyler Dancy, Kannapolis NC (America/New_York). A personal weekly show,
 listened to on a 6:00am Monday commute. Deliver a plain-text script. No audio
 generation — `publish.py` does that.
 
@@ -14,133 +17,93 @@ generation — `publish.py` does that.
 
 ## PRECEDENCE — read this before anything else
 
-Three files, three jobs. They must never overlap again.
-
 | Question | Authority |
 |---|---|
 | **How** the show is made — segments, runtime, TTS, markers, sourcing, output | **This file** |
-| **What** gets recommended — taste, exclusions, tiers, ledger, threads | `JARVIS Content Memory` Gmail draft |
-| Question bank + refinement log | `podcast-preferences.md` |
+| Sports, AI/tech and Disney sourcing detail, question bank, refinement log | `podcast-preferences.md` |
+| Suggestions (watch/read/listen), taste, the weekly email | The `weekly-queue` scheduled task and the `JARVIS Content Memory` Gmail draft — **not this file, not this show** |
 
 The scheduled task at `~/Claude/Scheduled/monday-brief-podcast/SKILL.md` is a
 thin pointer to this file and carries no rules of its own. If you are reading
 rules there, they are stale — trust this file.
 
-`episode-ledger.md` and the taste sections of `podcast-preferences.md` are
-**historical archives**, retained as restore sources. Never read them for a
-live decision.
+---
+
+## `_moved_to_weekly_queue` — what left this show and why
+
+Until 2026-09-14, this show carried a Watch/Read/Listen segment (three picks,
+~750 words) and closed with two taste-calibration questions. Both are gone.
+
+**Why.** Tyler asked to reformat the show to be an appointments-and-news
+recap only, with the recommendation content moved to a weekly email instead.
+Two things made this the right split rather than just a preference:
+
+1. **The show is public.** `scripts/` auto-publishes to a Spotify feed on a
+   public GitHub repo. Suggestions never needed to be public — they were
+   here because the show was the only delivery surface that existed yet.
+   An email is a cleaner fit for content that is inherently personal-taste
+   and needed private, so it can talk like it, and it never has to be
+   filtered for a stranger's ears.
+2. **It decouples this show from the JARVIS Content Memory entirely.** That
+   memory object has had a live, unresolved size-ceiling problem for
+   weeks (see `podcast-preferences.md`'s refinement log, September 2026)
+   that has repeatedly blocked writes. This show no longer reads or writes
+   that memory at all — it has no `week_picks`, no taste rules, no ledger,
+   no research pass. One less thing for that ceiling to break.
+
+The recommendation engine — taste rules, exclusions, streaming tiers,
+subjects, the ledger, the volume cap, the two taste-calibration questions —
+now lives entirely under the `weekly-queue` scheduled task
+(`~/Claude/Scheduled/weekly-queue/SKILL.md`), which researches, emails Tyler
+directly, and renders the interactive artifact with feedback buttons. If you
+are working on picks, taste, or the email, you are in the wrong file — go
+there instead.
 
 ---
 
-## THE TWO-SURFACE CONTRACT
+## OUTPUT ROUTING AND THE TWO RULES THAT COME FIRST
 
-One research pass per week. The Brief owns it.
-
-```
-Sunday 5:04pm   Monday Brief (PRODUCER)
-                reads memory, applies pending_marks, does the ONE research
-                pass, writes week_picks, writes the script, writes memory back
-
-Monday 5:54am   Weekly Queue (RENDERER)
-                reads week_picks, renders with runtimes and feedback buttons,
-                does the calendar review. Re-researches nothing.
-```
-
-An item can carry `surfaces: ["brief","queue"]` when it genuinely belongs to
-both. That is reinforcement, not duplication; the Queue frames it as "heard it
-Monday."
-
-### THE VOLUME CAP — three picks a week, total
-
-Set by Tyler 2026-08-07 and it governs BOTH surfaces combined.
-
-| Slot | What | Sizing |
-|---|---|---|
-| **LISTEN** | one podcast episode | ≤27 min (one leg), or 50–55 (one full day) |
-| **READ** | one book | audiobook competes with the listen slot — say so |
-| **WATCH** | one film or TV season | evening or weekend |
-
-That is the whole week. Not three per surface — three altogether.
-
-**Why.** On 2026-08-07 Tyler reported he had not attempted a single one of the
-four tracked picks from Aug 3–4. Not disliked: never started. That slate was
-about 320 minutes of audio against a stated weekly budget of about 216, before
-counting books and a four-part docuseries. The system was suggesting more than
-he could consume, so most picks generated no signal at all. Ten unwatched
-suggestions teach nothing; three finished ones teach everything.
-
-Consequences, all of which are improvements:
-
-- **No more "short list."** One watch pick, argued properly.
-- **The catalog slot rotates through the three**, it is not a fourth item.
-- **Music and YouTube are not standing slots.** They appear only when genuinely
-  exceptional, and then they REPLACE one of the three rather than adding to it.
-- **A Tier 2 subscription case may still name supporting titles**, because the
-  billing-month argument needs them. Those are evidence for a decision, not
-  picks: they get no button, no ledger entry, no slot.
-- **Watch/Read/Listen keeps its full word budget**, so three picks get ~250
-  words each instead of nine getting 80. "The fix is specificity, not volume"
-  has been a stated preference since 2026-08-03; this is finally it.
-
-If a week genuinely has four things worth his time, hold one for next week and
-say so. A held pick is a stronger episode next Monday.
-
----
-
-## OUTPUT ROUTING
-
-**There is one episode format, and it is impersonal culture curation.**
-
-Every episode goes to `PODCAST_DIR/scripts/`, which auto-publishes: a push there
-triggers the GitHub Actions workflow, which narrates the script and pushes to
+**There is one format, and the show is still public.** Every episode goes to
+`PODCAST_DIR/scripts/`, which auto-publishes: a push there triggers GitHub
+Actions, which narrates the script and pushes to
 `github.com/jtdancy-jarvis/monday-brief` — a **public** repo serving a feed
-claimed on Spotify. Everything written for the show is therefore written for
-strangers.
+claimed on Spotify. Everything written for the show is written for strangers,
+including the new appointments segment.
 
-No calendar segment. No inbox segment. No family names, travel dates, payday,
-health, or account detail — not hedged, not abbreviated, not at all.
+Two rules outlive any format question, because audio outlives its context and
+a passenger may be in the car, and because this is now the rule that keeps
+Tyler's calendar off a public feed:
 
-**Personal context lives on the Weekly Queue**, the Monday 5:54am artifact,
-which is private to Tyler and is where the calendar review happens. If something
-is worth saying but cannot be published, it belongs there, not in the script.
+- **Never read account numbers, dollar balances, health or medical detail,
+  or family names, on air, ever.** Not hedged, not abbreviated, not at all.
+- **Never say or imply that Tyler is traveling, about to travel, or that the
+  house will be or is empty.** This is the single most important rule in
+  this file. See "THIS WEEK AHEAD" below for exactly how the appointments
+  segment enforces it — when in doubt, that segment skips itself rather than
+  risk it, the same way AI & Tech already skips itself when nothing clears
+  its bar.
 
 Filenames must contain the date: `monday-brief-YYYY-MM-DD.txt`, dated for the
 **Monday it airs**. CI reads the date off the filename — a script without one
 fails the run.
 
-Two rules that outlive any format question, because audio outlives its context
-and a passenger may be in the car:
-
-- Never read account numbers or dollar balances aloud. Calendar titles sometimes
-  embed amounts (there is a recurring "Outback $425"). Strip the figure, keep
-  the event.
-- Forward travel dates, and stretches when the house is empty, never go anywhere
-  that publishes.
-
-### Retired: the private episode format
-
-Tyler answered the `private-hosting` question NO on 2026-08-11: public-only is
-enough, no personal feed wanted. That closed the longest-running blocker in the
-system and retired an entire second format — a `scripts-private/` folder holding
-full personal episodes with a calendar segment and an inbox segment, which never
-auto-published.
-
-`scripts-private/` is **discontinued**. Do not write to it, do not restore the
-second format, and do not treat the absence of a calendar segment as a gap to be
-filled. The old two-column layout is in this file's git history if the decision
-is ever reversed; it is deliberately not reproduced here, because two formats
-described side by side is exactly how this file drifted the first time.
+`scripts-private/` remains discontinued from the prior format. Do not write
+to it, do not restore a second format, and do not treat the new, franker
+appointments segment as a reason to reconsider that — this segment is
+deliberately built to be safe for a public feed, not an excuse to loosen the
+feed's privacy bar.
 
 ---
 
 ## RUNTIME — seasonal
 
-Confirmed by Tyler 2026-08-07.
+Cut roughly in half from the old spec now that the show has no culture
+segment. Confirmed with Tyler 2026-09-15.
 
 | Season | Words | Minutes at 150 wpm |
 |---|---|---|
-| **May–Oct** (offseason) | **1,500–2,000** | 10–13 |
-| **Nov–Apr** (UNC basketball) | **2,100–2,700** | 14–18 |
+| **May–Oct** (offseason) | **900–1,150** | 6–8 |
+| **Nov–Apr** (UNC basketball) | **1,300–1,700** | 9–11 |
 
 Verify on the **stripped** text — markers otherwise inflate `wc -w`:
 
@@ -160,42 +123,32 @@ is driving.
 
 ## STRUCTURE
 
-One layout. The words that used to go to a calendar and an inbox go to culture
-and sports instead, which is why Watch/Read/Listen is the biggest segment in the
-show by a wide margin.
-
 | Segment | Offseason | In-season delta |
 |---|---|---|
-| 1. Cold open | 85 | — |
+| 1. Cold open | 80 | — |
 | 2. AI & tech | 150, often 0 | — |
-| 3. Watch, read, listen | **750** | — |
-| 4. Sports | **500** | → 950 |
+| 3. This week ahead | 100, sometimes 0 | — |
+| 4. Sports | 500 | → 950 |
 | 5. Disney | 160 | — |
-| 6. Two questions | 85 | — |
-| 7. Sign-off | 55 | — |
-| | **~1,785** | |
+| 6. Sign-off | 45 | — |
+| | **~1,035** | |
 
-When a week is crowded, **Watch/Read/Listen grows first** — ahead of Sports,
-Disney, and AI & tech. Confirmed by Tyler 2026-08-11. This matters once
-in-season basketball starts pressuring the runtime in November.
-
-### 1. COLD OPEN (~85)
+### 1. COLD OPEN (~80)
 "Good morning, Tyler. It's [Weekday], [Month] [day]." State the runtime.
-Preview the biggest culture item, the biggest news story, and one sports item.
-Hand off.
+Preview the biggest news story, the calendar's shape if the segment is
+running this week, and one sports item. Hand off.
 
 ### 2. AI & TECH (~150, and often zero)
-**Minimized.** Skip the segment entirely on an ordinary week rather than
-filling it. When you skip it, say so in one line — it tells him the bar is
-being applied, and it costs eight words.
+Unchanged from before. **Minimized.** Skip the segment entirely on an
+ordinary week rather than filling it. When you skip it, say so in one line.
 
-Clears the bar: a real capability jump with verifiable evidence; a major safety
-or security incident; regulation that actually binds; a chip or company move
-that reshapes the market.
+Clears the bar: a real capability jump with verifiable evidence; a major
+safety or security incident; regulation that actually binds; a chip or
+company move that reshapes the market.
 
-Does not clear it: incremental model releases, funding rounds, product updates,
-benchmark scores, executive shuffles, anything an aggregator is excited about.
-No week-ahead earnings or macro beat.
+Does not clear it: incremental model releases, funding rounds, product
+updates, benchmark scores, executive shuffles, anything an aggregator is
+excited about. No week-ahead earnings or macro beat.
 
 Sourcing, with a domain allowlist: company engineering and research blogs,
 Reuters, Bloomberg, WSJ, Fortune, Ars Technica, TechTarget, MIT Technology
@@ -203,76 +156,104 @@ Review, Nature. Content farms garble details and occasionally invent whole
 events. Verify every dramatic claim against a primary source. **Unconfirmed
 means excluded, not hedged.** Attribute contested reporting out loud.
 
-### 3. WATCH, READ, LISTEN (~750)
-The centre of the show. **Three picks, no more** — see the volume cap above.
-Taste is governed entirely by shared memory — read it, do not improvise from
-this file.
+### 3. THIS WEEK AHEAD (~100, sometimes zero) — NEW, read the guardrails
 
-With three picks and 750 words, each one gets about 250. Use them. Argue the
-pick, name the comparison, flag the slow start, state the runtime and what it
-fits. A pick that cannot justify 250 words is not strong enough to be one of
-the three.
+This replaces the old calendar-free rule with something deliberately
+narrower than "recap Tyler's appointments" sounds like. **The show does not
+describe Tyler's week. It describes the week's shape, in three fixed tiers,
+and nothing else.**
 
-Four things this file does own:
+**Source.** The "Home Life" calendar on Tyler's primary Google account,
+`mcp__bb2c4eb0-a755-4dba-b81a-dccf6864dc15__list_events`, the coming 7 days
+from the Monday this airs.
 
-- **Lead every film/TV pitch with register, not premise.** Tone is the gate he
-  judges on first.
-- **Lead every nonfiction pitch with shape** — the journey and the narrator —
-  not the topic.
-- **Name the specific episode, film, or book with a runtime.** Never a channel,
-  never a series in the abstract.
-- **Say the comparison out loud** when pitching against a known favourite, so
-  the feedback mark is interpretable.
+**What you are allowed to say — the entire vocabulary:**
+- One of exactly three shape words, picked by counting non-work "Home Life"
+  events in the window: **light** (0–2), **typical** (3–5), **full** (6+).
+- Optionally, ONE generic clause naming a broad category if — and only
+  if — at least two independent events on the calendar plainly belong to
+  that category with nothing else identifying about them: "family things,"
+  "errands," "the usual mix." Never a specific event title, never a count
+  of the category, never which day.
 
-Close the segment with one line telling him the rest is on his Weekly Queue
-page, with buttons to mark what landed.
+That is the entire inventory. There is no fourth thing to add. Do not name a
+day of the week an appointment falls on. Do not name a time. Do not name a
+location, even generically ("downtown," "the coast"). Do not name who is
+involved, family or otherwise. Do not mention anything health- or
+appointment-type-specific — a specific mention of "doctor," "dentist,"
+"school," "work trip" etc. is exactly the kind of specific the tier system
+exists to avoid, even though none of those words is dangerous on its own;
+the rule is categorical, not case-by-case judgment on a live run.
+
+**The travel and absence rule — this is why the segment exists to be able to
+skip itself.** If ANYTHING on the calendar in the window signals travel, an
+out-of-office block, a multi-day event, or any reasonable inference that the
+house will be empty, **do not run this segment at all this week.** Do not
+try to describe around it, do not fold it into "full," do not mention that
+you're skipping because of travel. Just skip it exactly the way AI & Tech
+skips when nothing clears its bar — one line, "nothing on the calendar worth
+a shape this week," and move on. A skipped segment reveals nothing. A
+segment that visibly avoids a topic reveals that there was something to
+avoid, which is its own leak — so the skip line must be the same
+one-liner whether the reason is travel, an empty calendar, or anything
+else. Never let the skip reason be inferable from the wording.
+
+**Worked example of the whole segment, light tier:** "The week ahead looks
+light, mostly the usual mix." That is a complete, correct instance — nothing
+else is owed.
+
+**Why so narrow.** Multi-week pattern-matching is the actual threat model
+for a public feed, not any single episode. A stalker or a burglar does not
+need one episode to say "Tyler is away" — a run of "full" weeks followed
+abruptly by silence, or a "light" week that reliably correlates with a
+trip, teaches the same thing over months. The fixed three-word vocabulary
+and the mandatory silent skip on travel signals exist specifically to
+prevent the segment from becoming a distinguishable signal over time, not
+just to sanitize any one week's script.
 
 ### 4. SPORTS (~500; ~950 in-season)
-**UNC men's basketball leads year-round**, with one standing exception: inside
-three weeks of a football game, football leads. Basketball still gets its beat.
+Unchanged from before. **UNC men's basketball leads year-round**, with one
+standing exception: inside three weeks of a football game, football leads.
+Basketball still gets its beat.
 
-- In season: this week's games, opponents, tip times ET, channels. Last week in
-  a sentence or two. Rotation, roster, injuries, ACC standings, national
+- In season: this week's games, opponents, tip times ET, channels. Last week
+  in a sentence or two. Rotation, roster, injuries, ACC standings, national
   picture, and where the season stands as an arc.
 - Offseason: roster moves, portal, staff, recruiting, program storylines.
 
 Sourcing: goheels.com, 247Sports, On3, Inside Carolina, News & Observer, CBS
-Sports, ESPN. **Never report recruiting rumor or coaching speculation as fact.**
-Flag unconfirmed items and name who is reporting.
+Sports, ESPN. **Never report recruiting rumor or coaching speculation as
+fact.** Flag unconfirmed items and name who is reporting.
 
-Then **golf**. Scope is set by shared memory and is narrower than it looks: in
-are architecture, design, travel, destination. Out are player profiles and tour
-personality pieces. Tournament results are news and belong here — but lead with
-the ground, not the leaderboard, when there is anything to say about the course.
+Then **golf**. In are architecture, design, travel, destination. Out are
+player profiles and tour personality pieces. Tournament results are news and
+belong here — lead with the ground, not the leaderboard, when there is
+anything to say about the course.
 
-Then briefly UNC football, Carolina Panthers, Charlotte Hornets: day, time ET,
-channel, one line on stakes. Out-of-season teams get a clause. Skip Charlotte FC
-and NASCAR.
+Then briefly UNC football, Carolina Panthers, Charlotte Hornets: day, time
+ET, channel, one line on stakes. Out-of-season teams get a clause. Skip
+Charlotte FC and NASCAR.
 
 ### 5. DISNEY (~160)
-Standing segment. Rotate across parks news, new attractions, crowd calendars
-and booking windows, Imagineering and design history, Pixar and animation,
-notable company news. Sources: Disney Parks Blog, WDWNT, Blog Mickey,
-Attractions Magazine, Laughing Place.
+Unchanged from before. Standing segment. Rotate across parks news, new
+attractions, crowd calendars and booking windows, Imagineering and design
+history, Pixar and animation, notable company news. Sources: Disney Parks
+Blog, WDWNT, Blog Mickey, Attractions Magazine, Laughing Place.
 
-**Distinguish confirmed announcements from rumor** — the Disney fan press runs
-on speculation and he will notice. Skip the segment rather than padding it.
+**Distinguish confirmed announcements from rumor.** Skip the segment rather
+than padding it.
 
-### 6. TWO QUESTIONS (~85)
-Exactly two, from the bank in `podcast-preferences.md`. Rotate categories, never
-repeat within eight weeks — check the refinement log. Prefer questions that
-close an OPEN thread in shared memory. Conversational. Say what each answer will
-change, and tell him he can just tell Claude the answer.
-
-### 7. SIGN-OFF (~55)
-One sentence recapping concrete commitments plus any can't-miss event. Then
-exactly: **"Have a good one, Tyler. See you next Monday."**
+### 6. SIGN-OFF (~45)
+One sentence recapping the concrete news items plus any can't-miss sports
+event. No mention of the email or the artifact — this show doesn't carry
+picks anymore, so there's nothing here to point at. Then exactly:
+**"Have a good one, Tyler. See you next Monday."**
 
 ---
 
 ## TTS FORMATTING
 
-The file goes straight into text-to-speech.
+Unchanged from before. The file goes straight into text-to-speech.
 
 - Plain prose only. No markdown, headers, bullets, asterisks, or em-dashes.
   Periods and commas.
@@ -292,31 +273,29 @@ grep -n '[0-9]'  <file>
 
 ### Pause and transition markers
 
-`audio_post.py` implements these and they become real audio. They are stripped
-before the text reaches the narrator, so they are never spoken.
+`audio_post.py` implements these and they become real audio. They are
+stripped before the text reaches the narrator, so they are never spoken.
 
 Each on its own line, blank line either side.
 
-- `[[TRANSITION]]` — a short music sting, padded with 0.35s of silence on each
-  side so the music registers as a break rather than a blip against the next
-  line of speech. **One before each major segment.** Never inside a segment.
-- `[[PAUSE]]` — 0.85s. Before a line that should land. Two or three an episode.
-  Overused, it sounds portentous.
-- `[[BEAT]]` — 1.7s. A longer hold. Once an episode at most, usually before the
-  sign-off.
+- `[[TRANSITION]]` — a short music sting, padded with 0.35s of silence on
+  each side so the music registers as a break rather than a blip against the
+  next line of speech. **One before each major segment.** Never inside a
+  segment. With four segment transitions now (AI & Tech, This Week Ahead,
+  Sports, Disney) rather than the old five, expect one fewer than before.
+- `[[PAUSE]]` — 0.85s. Before a line that should land. One or two an
+  episode now that the show is shorter — the old "two or three" guidance
+  scaled down with everything else.
+- `[[BEAT]]` — 1.7s. A longer hold. Once an episode at most, usually before
+  the sign-off.
 
-Revised 2026-09-13, after Tyler reported the original timings (0.55s /
-1.1s / no padding around the sting) read as clipped and abrupt on actual
-TTS output. The sting's "air either side" had been documented since this
-file's first version but never implemented — a transition used to land with
-zero silence before or after it, which is most of why it read as rushed.
 `audio_post.py`'s own docstring and `MARKERS`/`STING_PAD` constants are the
 source of truth for the exact numbers; this file states them for reference
-only, and the two must not drift again.
+only, and the two must not drift again — see that file's changelog entry
+from 2026-09-13 for why this matters.
 
-**A script with zero markers narrates as one unbroken block.** That is a real
-quality loss and it is the default failure — the 2026-08-10 episode shipped
-that way. Confirm before finishing:
+**A script with zero markers narrates as one unbroken block.** Confirm
+before finishing:
 
 ```
 python3 -c "import sys;sys.path.insert(0,'.');import audio_post,pathlib;\
@@ -324,153 +303,68 @@ tl=audio_post.build_timeline(pathlib.Path('SCRIPT').read_text());\
 print('non-speech blocks:', sum(1 for k,_ in tl if k!='speech'))"
 ```
 
-Each `[[TRANSITION]]` now expands to three non-speech blocks (silence, sting,
-silence) instead of one, so the total is higher than it used to be. For a
-typical episode — five section transitions plus two or three pauses and one
-beat — expect roughly eighteen to twenty, not six or seven. What to actually
-check is the marker count in the raw script text (five transitions, two or
-three pauses, at most one beat), not the expanded block count.
+Each `[[TRANSITION]]` expands to three non-speech blocks (silence, sting,
+silence). For a typical shorter episode — three or four section transitions
+plus one or two pauses and at most one beat — expect roughly eleven to
+fifteen, not the old eighteen to twenty. What to actually check is the
+marker count in the raw script text, not the expanded block count.
 
 ### Emphasis
 
 `tts-1` supports no SSML and no delivery control, so emphasis comes from the
-writing. Short sentences land harder than long ones. A one-line paragraph after
-a long one is the strongest emphasis available. Put the important word at the
-end of the sentence. Never use capitals or italics for stress — the narrator
-ignores them and the markdown stripper deletes them anyway.
-
-`config.json` is currently on `gpt-4o-mini-tts` with an `instructions` string,
-which does honour delivery direction. `publish.py` sends it only when present.
-
----
-
-## MEMORY PROTOCOL
-
-Full detail lives in the `_readme` of the `JARVIS Content Memory` Gmail draft.
-The shape of a run:
-
-1. **Load.** `list_drafts` with query `subject:"JARVIS Content Memory"` returns
-   id and full body in one call. Strip `\r`, `JSON.parse`. Gmail rewrites bare
-   URLs into `google.com/url?q=<real>` redirects — unwrap the `q` param on read,
-   write them bare and expect it to happen again. **Record the `schema` number
-   you read.** You will need it in step 8.
-2. **If the body will not parse, STOP.** Do not overwrite it. Restore from the
-   Weekly Queue artifact's mirror (`<script id="jarvis-memory-mirror">`), repair,
-   and say so in chat. Never write a guessed object over memory.
-3. **Apply `pending_marks`**, then set it to `[]`. UP +0.10 (ceiling 1.0), DOWN
-   −0.15 (floor 0.2). Read the `why` on a DOWN and fix that reason across all
-   picks. Downweight, never ban; retire a source only after three DOWNs with no
-   UP since.
-4. **Dedupe against `ledger`** — spans both surfaces. A source may recur; a
-   specific title never repeats on either surface.
-5. **Advance every OPEN and WAITING `thread`** — advance, close, or explicitly
-   record no movement. Say when a check was not performed, rather than implying
-   it was.
-6. **Research once.** Size every audio pick: real runtime, legs = ceil(min/27).
-   Prefer ≤27 min or 50–55. State a stopping point above 90.
-7. **Write `week_picks`** — `{id, medium, subject, title, src, url, mins, slot,
-   why, surfaces}`. `why` is reused verbatim by the Queue, so write it to be
-   read as well as heard.
-8. **Re-verify before writing.** Immediately before the `update_draft` call,
-   re-fetch the draft with a fresh `list_drafts` and check its `schema` number
-   against the one you recorded in step 1. If it has changed, **STOP — do not
-   write.** Something else touched this draft while you were working: another
-   session, a concurrent scheduled run, or a stale Gmail browser tab
-   autosaving over it are all real causes, not hypothetical ones. Overwriting
-   now either silently discards whatever that other write added, or buries it
-   under yours with no record either way. Say so loudly in chat, name both
-   schema numbers, and leave it for a human or the next session to reconcile
-   deliberately — the same posture as step 2's unparseable-body case. This
-   guard exists because of 2026-08-23: a producer run's schema-21 read was
-   found overwritten by schema-19 content sometime in the following three
-   days, cause never conclusively identified. See
-   `threads.open.memory-write-regression-2026-08-22` in memory for the writeup.
-9. **Write memory back** with `update_draft` on the same id. Never create a
-   second draft. Carry every key forward, preserve `_readme` and `_rule`
-   verbatim. Then **re-apply the label** — `update_draft` moves the draft to a
-   new thread and drops labels. `list_drafts` again for the new `threadId`, then
-   `label_thread` with `["Label_32", "STARRED"]`.
+writing. Short sentences land harder than long ones. Put the important word
+at the end of the sentence. Never use capitals or italics for stress.
 
 ---
 
 ## OUTPUT CHECKLIST
 
 1. Save to `PODCAST_DIR/scripts/monday-brief-YYYY-MM-DD.txt`, dated for the
-   Monday it airs. There is no second destination — see Output Routing.
-2. Word count in range, on stripped text.
-3. Both greps clean. Marker count in the expected range.
-4. No dollar figures, account numbers, family names, travel dates or health
-   detail anywhere in the script. It publishes to a public feed.
-5. Confirm the file is on disk and non-empty. If `PODCAST_DIR` is unreachable
-   (it is iCloud-synced and may not mount on a scheduled run), write to outputs,
-   still update memory — Gmail is always reachable — and **say loudly in chat**
-   that the script did not reach the publish folder.
-6. Append a dated entry to the Refinement log in `podcast-preferences.md`
-   recording the two questions asked.
-7. `present_files` with the script path.
-8. In chat, four lines: word count and runtime; the lead story; the two
-   questions; confirmation the script landed and `week_picks` was written.
+   Monday it airs. There is no second destination.
+2. Word count in range, on stripped text (900–1,150 offseason, 1,300–1,700
+   in-season).
+3. Both TTS greps clean. Marker count in the expected range.
+4. **No dollar figures, account numbers, family names, travel signals, or
+   health detail anywhere in the script — it publishes to a public feed.**
+   Re-read "This Week Ahead" specifically against its own vocabulary limit:
+   if it says anything beyond one shape word and one permitted generic
+   clause, cut it back before shipping, not after.
+5. Confirm the file is on disk and non-empty. If `PODCAST_DIR` is
+   unreachable (it is iCloud-synced and may not mount on a scheduled run),
+   write to outputs and **say loudly in chat** that the script did not reach
+   the publish folder.
+6. `present_files` with the script path.
+7. In chat, three or four lines: word count and runtime; the lead story;
+   whether This Week Ahead ran or skipped (and if it skipped, don't say
+   why); confirmation the script landed on disk.
+
+This show no longer touches the `JARVIS Content Memory` Gmail draft at all —
+there is no memory-protocol step here anymore, no `pending_marks`, no
+`week_picks`, nothing to write back. If a run finds itself reading that
+draft while producing this show, it has picked up stale instructions from
+before 2026-09-15 — stop and re-read this file from the top.
 
 ---
 
 ## CHANGELOG
 
-**2026-09-13** — Fixed pause and transition timing in `audio_post.py` after
-Tyler reported the 2026-09-14 episode's pauses and transitions read as too
-quick on actual TTS output. `[[PAUSE]]` raised 0.55s to 0.85s, `[[BEAT]]`
-raised 1.1s to 1.7s. `[[TRANSITION]]` now pads 0.35s of silence on each side
-of the sting in `build_timeline()` — this file's own docstring had promised
-"air either side" since the very first version, but the code never actually
-added any, so a sting used to land with zero silence before or after it and
-cut directly against speech. That padding, not just the sting-music length,
-was most of what made transitions feel abrupt. Updated the "Pause and
-transition markers" section and its verification snippet accordingly: each
-transition now expands to three non-speech blocks instead of one, so the
-expected total block count moved from "roughly six or seven" to "roughly
-eighteen to twenty" for a typical episode. No script text needed to change —
-this is a rendering-time fix, not an authoring one, so it applies retroactively
-to any already-written script the next time it's rendered to audio, including
-2026-09-14's.
+**2026-09-15** — Restructured at Tyler's direction: this show is now
+appointments-shape plus news only. Removed the Watch/Read/Listen segment and
+the two on-air taste questions entirely; both moved to the `weekly-queue`
+scheduled task, which now also sends a weekly email with the picks and
+questions rather than only rendering the interactive artifact. Added "This
+Week Ahead," a new segment with a deliberately narrow three-word vocabulary
+(light/typical/full plus one optional generic clause) and a hard rule to
+silently skip itself on any travel or absence signal, because the show
+remains public and multi-week pattern-matching on a public feed is a real
+threat model, not a hypothetical one. Cut runtime targets roughly in half
+(900–1,150 offseason, 1,300–1,700 in-season) now that the 750-word culture
+segment is gone. This show no longer reads or writes the `JARVIS Content
+Memory` draft at all, which also takes it out of the blast radius of that
+memory's ongoing size-ceiling problem (see `podcast-preferences.md`).
 
-**2026-08-23** — Added a re-verify-before-write guard to the memory protocol
-(now step 8). A producer session found the `JARVIS Content Memory` draft had
-regressed from schema 21 to schema 19 sometime in the three days after it was
-last read that way — same draft id, new thread/message id, older content under
-a newer timestamp, meaning a real write happened, not a caching artifact.
-Traced through every plausibly-connected session in that window and could not
-identify the writer; concurrent Claude sessions and a stale Gmail browser tab
-autosaving over the draft are both live hypotheses, neither confirmed. Rather
-than leave the gap unguarded, every write now re-checks the draft's schema
-number immediately before committing and refuses to overwrite if it moved
-since the run started reading. See `threads.open.memory-write-regression-2026-08-22`
-in memory for the full incident writeup and the restore that followed it
-(schema 22).
-
-**2026-08-17** — Collapsed to a single episode format. Tyler answered
-`private-hosting` NO on 2026-08-11 (public-only is enough, no personal feed
-wanted), which retired `scripts-private/` and the entire personal layout. This
-file had gone on describing the impersonal format as *conditional* on that
-thread being open — true by accident rather than by rule, and a trap for any
-future run that noticed the thread was closed and concluded the condition no
-longer applied.
-
-Removed: the two-destination routing table, the public/private segment budget
-columns, the "Your week" calendar and inbox segment, and the private-episode
-variant of the cold open. Segments renumbered 1–7. The retired format is
-recorded in one clearly-marked non-operative subsection and in git history,
-rather than described alongside the live one — describing two formats side by
-side is precisely what caused the drift this file was created to end.
-
-Added: the 2026-08-11 answer that Watch/Read/Listen is the segment that grows
-first when a week is crowded. Sharpened checklist item 4 from "no dollar
-figures" to the full list of things that must never reach a public feed.
-
-**2026-08-07** — Merged two contradicting skill files into this one. Resolved:
-output routing (format follows destination, table above); offseason runtime to
-1,500–2,000 and in-season to 2,100–2,700 per Tyler; continuity moved from
-`episode-ledger.md` to shared memory; taste moved to shared memory; added the
-two-surface contract; added separate public and private segment budgets, which
-neither old file had. Fixed a dead pointer that sent the producer to
-`podcast-preferences.md` for segment structure that only ever existed here.
-Restored the audio-marker spec, which the scheduled task had dropped entirely —
-the 2026-08-10 episode shipped with zero markers as a result.
+Prior history (the 2026-08-07 through 2026-08-23 merges, the volume cap, the
+two-surface contract as it applied to this show, the private-hosting
+decision) is preserved in git history and in `podcast-preferences.md`'s
+refinement log, but is no longer reproduced here since most of it described
+a segment this show no longer has.

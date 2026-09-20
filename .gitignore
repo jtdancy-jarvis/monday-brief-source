@@ -18,6 +18,24 @@ repo/
 # already backing them up.
 scripts-private/
 
+# A clone of microsoft/markitdown living inside scripts/. Two hazards, which
+# is why it is named explicitly rather than left to chance:
+#   - 144 of its files are .txt/.md under scripts/, which is exactly the path
+#     filter that triggers the publish workflow. Committing any of them starts
+#     a publish run.
+#   - it is ~9,400 files with its own .git/, so it would land as a stray
+#     gitlink in a repo that is meant to hold a publisher and some scripts.
+# Git currently declines to recurse into it because of that nested .git, which
+# is the only reason `ship` has not tripped over it. Remove the nested .git and
+# that protection disappears -- hence this line. Better still, move the clone
+# somewhere outside scripts/.
+scripts/markitdown/
+
+# Scratch copies of real scripts, date-stamped like the real thing. Outside
+# scripts/ so CI never sees them; ignored so they cannot be committed by
+# accident and then picked up after someone moves one.
+scripts-test/
+
 # assets/*.wav ARE committed on purpose. audio_post.master() skips the music
 # beds silently when they are missing, so a runner without them produces a
 # quietly worse episode rather than an error.

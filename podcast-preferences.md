@@ -1,23 +1,33 @@
-# Monday Brief — question bank and refinement log
+# Monday Brief / Weekly Queue — question bank and refinement log
 
 > **THIS FILE OWNS TWO THINGS: the question bank and the refinement log.**
 > Everything below the ARCHIVE line is frozen and must not be read for a live
-> decision. Updated 2026-08-07.
+> decision. Updated 2026-09-15.
 >
-> - **HOW the show is made** — segments, runtime, TTS formatting, pause and
->   transition markers, sourcing, output routing — is in `SKILL-monday-brief.md`.
->   This file never had the segment structure, despite a pointer that claimed it
->   did. That dead link is fixed.
-> - **WHAT gets recommended** — taste rules, exclusions, tiers, subject weights,
->   the ledger, threads, the ask queue — is in the **JARVIS Content Memory**
->   Gmail draft (schema 11), shared with the Weekly Queue artifact.
+> - **HOW the public podcast is made** — segments (appointments-shape plus
+>   news, since 2026-09-15), runtime, TTS formatting, pause and transition
+>   markers, sourcing, output routing — is in `SKILL-monday-brief.md`. That
+>   show no longer carries the two questions below; it no longer carries any
+>   recommendations at all.
+> - **WHAT gets recommended, and the two questions each week** — taste
+>   rules, exclusions, tiers, subject weights, the ledger, threads, the ask
+>   queue — is owned by the `weekly-queue` scheduled task, using the
+>   **JARVIS Content Memory** Gmail draft as its taste model. Since
+>   2026-09-15 the picks and the two questions are delivered by email
+>   (plus the interactive artifact for feedback buttons), not spoken on
+>   air. This file's question bank and refinement log are shared by
+>   whichever surface is currently asking — read `weekly-queue`'s own
+>   `SKILL.md` for the mechanics of drafting and logging a question now.
 
 ---
 
 ## HOW TO SPEND THE TWO QUESTIONS
 
-Airtime is the scarce channel. Two questions a week, and each one costs about
-forty words of an episode that also has to carry culture, sports and Disney.
+Until 2026-09-15 these ran on air, where airtime was the scarce channel. They
+now go out in the weekly email instead, alongside the three picks. The
+channel changed; the discipline didn't — two questions a week, not more,
+because the point was never that space was scarce, it's that asking more
+than two a week trains him to skim past all of them.
 
 **Spend them only on asks no button can collect.**
 
@@ -143,6 +153,49 @@ button can reach them)*
 ---
 
 ## REFINEMENT LOG
+
+### 2026-09-15 — system restructure, no episode
+
+Tyler asked, directly in chat, to reformat the show: appointments-and-news
+recap only, with the recommendations portion moved to a weekly email
+instead. Two things drove how this got split rather than just moved:
+
+**The public feed problem.** `PODCAST_DIR/scripts/` still auto-publishes to
+a public Spotify/GitHub feed. Reading real calendar specifics onto that feed
+— times, locations, names, and especially any signal of travel or an empty
+house — would be a real safety issue, not just a taste one. Flagged this to
+Tyler before touching anything; he confirmed he wants the show to stay
+public with appointments kept vague, not made private. Built "This Week
+Ahead," a new segment in `SKILL-monday-brief.md` with a deliberately narrow
+three-word vocabulary (light/typical/full, plus one optional generic clause)
+and a hard rule to silently skip itself — same one-line skip regardless of
+reason — on any travel or absence signal. The threat model that rule guards
+against is multi-week pattern-matching on a public feed, not any single
+episode.
+
+**The memory-ceiling side effect.** The `JARVIS Content Memory` draft has had
+an unresolved size-ceiling problem for weeks (see the 2026-09-07 and
+2026-09-14 entries below). Moving recommendations off the podcast entirely
+means the podcast no longer reads or writes that memory at all — one fewer
+thing in that ceiling's blast radius. The ceiling itself is still unresolved
+and now lives entirely under `weekly-queue`.
+
+Rewrote three files: `SKILL-monday-brief.md` (new structure, runtime cut
+roughly in half now that the ~750-word culture segment is gone, the two
+questions removed), the `weekly-queue` scheduled task (now the sole owner of
+research, picks, and the two questions — no longer just a renderer waiting
+on a Saturday handoff — plus a new Step 5 that sends the picks as a real,
+auto-sent email to jtdancy@gmail.com rather than only rendering the
+artifact), and the `monday-brief-podcast` scheduled task's three
+non-negotiables (dropped the memory-protocol bullet entirely, added the This
+Week Ahead vocabulary/skip rule). Also updated this file's own header note
+and the "how to spend the two questions" section to point at `weekly-queue`
+instead of airtime.
+
+**Not done, left for a later session:** actually migrating historical
+`week_picks`/ledger entries tagged `surfaces: ["brief"]` — they're left as
+historical record rather than rewritten. The underlying memory size-ceiling
+problem is also untouched by this change; it's relocated, not fixed.
 
 ### 2026-09-14 (scheduled producer run)
 
