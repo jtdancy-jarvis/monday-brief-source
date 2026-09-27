@@ -107,15 +107,40 @@ jobs:
                  --draft --notes "preflight probe, deleted immediately" >/dev/null 2>&1; then
             # Distinguish the two ways this goes wrong, because they are fixed
             # on different screens and the error is otherwise a guess.
-            if gh api repos/jtdancy-jarvis/monday-brief --silent >/dev/null 2>&1; then
-              echo "::error::FEED_REPO_TOKEN can SEE jtdancy-jarvis/monday-brief but cannot create releases there. So 'Repository access' is right and the permission is wrong: on the token, set Permissions -> Repository permissions -> Contents to 'Read and write' (Contents governs releases; 'Read-only' is not enough). Then: gh secret set FEED_REPO_TOKEN --repo jtdancy-jarvis/monday-brief-source"
+            # Three distinct causes, three different fixes. Narrow it down
+            # instead of making someone guess: can the token authenticate at
+            # all, can it see the repo, or can it only not write?
+            if ! gh api user --silent >/dev/null 2>&1; then
+              echo "::error::FEED_REPO_TOKEN does not authenticate at all -- it cannot even identify its own user. That means EXPIRED, revoked, or mistyped, not misconfigured; a scope problem still lets a token read /user. Fine-grained PATs expire on a date you chose when creating them, and this is what that looks like on the day. Generate a new one (repository access: only jtdancy-jarvis/monday-brief, permission Contents: Read and write) and run: gh secret set FEED_REPO_TOKEN --repo jtdancy-jarvis/monday-brief-source"
+            elif ! gh api repos/jtdancy-jarvis/monday-brief --silent >/dev/null 2>&1; then
+              echo "::error::FEED_REPO_TOKEN authenticates but cannot read jtdancy-jarvis/monday-brief, so it is not scoped to that repository. On the token, set 'Repository access' -> 'Only select repositories' and pick jtdancy-jarvis/monday-brief (note: monday-brief, NOT monday-brief-source -- the audio is published to the public feed repo). Then: gh secret set FEED_REPO_TOKEN --repo jtdancy-jarvis/monday-brief-source"
             else
-              echo "::error::FEED_REPO_TOKEN cannot even read jtdancy-jarvis/monday-brief, so it is not scoped to that repository. On the token, set 'Repository access' -> 'Only select repositories' and pick jtdancy-jarvis/monday-brief (note: monday-brief, NOT monday-brief-source -- the audio is published to the public feed repo). Then: gh secret set FEED_REPO_TOKEN --repo jtdancy-jarvis/monday-brief-source"
+              echo "::error::FEED_REPO_TOKEN can SEE jtdancy-jarvis/monday-brief but cannot create releases there. So 'Repository access' is right and the permission is wrong: on the token, set Permissions -> Repository permissions -> Contents to 'Read and write' (Contents governs releases; 'Read-only' is not enough). Then: gh secret set FEED_REPO_TOKEN --repo jtdancy-jarvis/monday-brief-source"
             fi
             exit 1
           fi
           gh release delete "$probe" --repo jtdancy-jarvis/monday-brief --yes >/dev/null 2>&1 || true
           echo "token OK: created and deleted a draft release"
+
+          # Warn while there is still time to act. The token expiring is not a
+          # hypothetical: it took out the 2026-09-28 run, and "it worked last
+          # week" is exactly the signal you get right up until it does not.
+          # GitHub reports the expiry date in a response header for PATs that
+          # have one; absent header means no expiry or not a PAT, so stay quiet.
+          exp=$(gh api repos/jtdancy-jarvis/monday-brief -i 2>/dev/null \
+                | tr -d '\r' \
+                | sed -n 's/^github-authentication-token-expiration: //Ip' \
+                | head -1)
+          if [ -n "$exp" ]; then
+            exp_epoch=$(date -u -d "$exp" +%s 2>/dev/null || echo "")
+            if [ -n "$exp_epoch" ]; then
+              days=$(( (exp_epoch - $(date -u +%s)) / 86400 ))
+              echo "FEED_REPO_TOKEN expires $exp ($days days)"
+              if [ "$days" -lt 14 ]; then
+                echo "::warning::FEED_REPO_TOKEN expires in $days days ($exp). Replace it BEFORE then, or a Sunday publish fails on the day: generate a new fine-grained PAT (repository access: only jtdancy-jarvis/monday-brief, permission Contents: Read and write) and run 'gh secret set FEED_REPO_TOKEN --repo jtdancy-jarvis/monday-brief-source'."
+              fi
+            fi
+          fi
 
           # Pages only serves feed.xml and sidecars now -- audio lives on
           # Releases and does not count. This should stay flat week to week.
